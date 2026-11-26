@@ -15,6 +15,8 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import BrandLogo from "../components/ui/BrandLogo";
+import DemoAnnouncement from "../components/demo/DemoAnnouncement";
+import { IS_DEMO_MODE } from "../utils/api";
 
 const SHOWCASE_TABS = [
   {
@@ -104,10 +106,10 @@ const LandingPage = () => {
               How it works
             </a>
             <Link
-              to="/login"
+              to={IS_DEMO_MODE ? "/demo" : "/login"}
               className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#134E4A]"
             >
-              Sign in
+              {IS_DEMO_MODE ? "Try live demo" : "Sign in"}
               <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           </nav>
@@ -152,11 +154,11 @@ const LandingPage = () => {
                 How it works
               </a>
               <Link
-                to="/login"
+                to={IS_DEMO_MODE ? "/demo" : "/login"}
                 onClick={() => setMobileOpen(false)}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#134E4A]"
               >
-                Sign in
+                {IS_DEMO_MODE ? "Try live demo" : "Sign in"}
                 <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
             </div>
@@ -182,10 +184,10 @@ const LandingPage = () => {
 
               <div className="mt-8 flex flex-wrap items-center gap-3.5">
                 <Link
-                  to="/login"
+                  to={IS_DEMO_MODE ? "/demo" : "/login"}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#134E4A]"
                 >
-                  Access workspace
+                  {IS_DEMO_MODE ? "Try live demo" : "Access workspace"}
                   <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
                 <a
@@ -470,18 +472,20 @@ const LandingPage = () => {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                to="/login"
+                to={IS_DEMO_MODE ? "/demo" : "/login"}
                 className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#134E4A] transition-colors hover:bg-teal-50"
               >
-                Sign in
+                {IS_DEMO_MODE ? "Try live demo" : "Sign in"}
                 <FontAwesomeIcon icon={faArrowRight} className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-              >
-                Professor sign up
-              </Link>
+              {!IS_DEMO_MODE && (
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                >
+                  Professor sign up
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -509,14 +513,15 @@ const LandingPage = () => {
               <a href="#how-it-works" className="hover:text-[#0F766E]">
                 How it works
               </a>
-              <Link to="/login" className="hover:text-[#0F766E]">
-                Sign in
+              <Link to={IS_DEMO_MODE ? "/demo" : "/login"} className="hover:text-[#0F766E]">
+                {IS_DEMO_MODE ? "Try live demo" : "Sign in"}
               </Link>
             </div>
             <p>Developed and maintained by Aymen Alioua.</p>
           </div>
         </div>
       </footer>
+      <DemoAnnouncement autoShow />
     </div>
   );
 };

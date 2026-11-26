@@ -5,6 +5,7 @@ import { faImage, faRotateLeft, faUpload } from "@fortawesome/free-solid-svg-ico
 import Button from "../ui/Button";
 import StatusBadge from "../ui/StatusBadge";
 import { LANDMARK_COLORS, LANDMARK_NAMES } from "../../utils/annotationCanvas";
+import { IS_DEMO_MODE } from "../../utils/api";
 
 const STEP_LABELS = ["Endpoint 1", "Vertex", "Endpoint 2"];
 
@@ -47,6 +48,21 @@ const AngleImageAnnotator = ({ label, value, onChange }) => {
       onChange({ image: reader.result, angles: [], points: [] });
     };
     reader.readAsDataURL(file);
+  };
+
+  const chooseSampleImage = async () => {
+    const sampleUrl =
+      label.toLowerCase() === "front"
+        ? "/demo-samples/tooth-front-sample.png"
+        : "/demo-samples/tooth-side-sample.png";
+    const response = await fetch(sampleUrl);
+    const blob = await response.blob();
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPoints([]);
+      onChange({ image: reader.result, angles: [], points: [] });
+    };
+    reader.readAsDataURL(blob);
   };
 
   const addPoint = (event) => {
@@ -96,11 +112,24 @@ const AngleImageAnnotator = ({ label, value, onChange }) => {
           </p>
         </div>
 
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0F766E] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#134E4A]">
-          <FontAwesomeIcon icon={faUpload} className="h-3.5 w-3.5" aria-hidden="true" />
-          {value.image ? "Replace image" : "Choose image"}
-          <input className="hidden" type="file" accept="image/*" onChange={chooseImage} />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          {IS_DEMO_MODE && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={chooseSampleImage}
+              data-testid={`use-sample-${label.toLowerCase()}`}
+            >
+              Use sample image
+            </Button>
+          )}
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0F766E] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#134E4A]">
+            <FontAwesomeIcon icon={faUpload} className="h-3.5 w-3.5" aria-hidden="true" />
+            {value.image ? "Replace image" : "Choose image"}
+            <input className="hidden" type="file" accept="image/*" onChange={chooseImage} />
+          </label>
+        </div>
       </div>
 
       {value.image ? (

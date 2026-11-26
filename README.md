@@ -2,7 +2,7 @@
   <img src="edent-frontend/public/favicon.svg" alt="eDent logo" width="68" height="68" />
 </p>
 
-<h1 align="center">eDent â€” Dental Education & Practical Work Platform</h1>
+<h1 align="center">eDent — Dental Education & Practical Work Platform</h1>
 
 <p align="center">
   Full-stack academic platform for dental practical assignments, interactive 9-landmark tooth-image analysis, automated geometric scoring, cohort analytics, and branded PDF reporting.
@@ -20,9 +20,9 @@
 
 <p align="center">
   <a href="https://github.com/aymenALa/eDent/tree/ui-enhancement"><strong>Full-Stack Source (<code>ui-enhancement</code>)</strong></a>
-  &nbsp;â€¢&nbsp;
+  &nbsp;•&nbsp;
   <a href="https://github.com/aymenALa/eDent/tree/portfolio-demo"><strong>Portfolio Demo Branch (<code>portfolio-demo</code>)</strong></a>
-  &nbsp;â€¢&nbsp;
+  &nbsp;•&nbsp;
   <a href="DEPLOYMENT.md"><strong>Deployment Guide</strong></a>
 </p>
 
@@ -32,15 +32,32 @@
 
 ## Table of Contents
 
+- [Application Modes](#application-modes)
 - [Architecture Diagrams](#architecture-diagrams)
 - [Technology Stack](#technology-stack)
 - [Product Screenshots](#product-screenshots)
-- [Local Installation â€” Full-Stack Mode (`ui-enhancement`)](#local-installation--full-stack-mode-ui-enhancement)
+- [Local Installation — Full-Stack Mode (`ui-enhancement`)](#local-installation--full-stack-mode-ui-enhancement)
 - [Local Demonstration Credentials](#local-demonstration-credentials)
-- [Local Installation â€” Browser Portfolio Demo (`portfolio-demo`)](#local-installation--browser-portfolio-demo-portfolio-demo)
+- [Local Installation — Browser Portfolio Demo (`portfolio-demo`)](#local-installation--browser-portfolio-demo-portfolio-demo)
 - [Project Structure](#project-structure)
 - [Security, Testing & Limitations](#security-testing--limitations)
 - [Project Authorship](#project-authorship)
+
+---
+
+## Application Modes
+
+eDent supports two distinct runtime modes:
+
+- **Full-Stack Mode** (`ui-enhancement` branch, `VITE_DEMO_MODE=false` or unset):
+  - Architecture: **React + Spring Boot + MySQL/TiDB + JWT authentication**.
+  - Requires a running backend and database; uses real password/BCrypt login, JWT tokens, and server-side role/ownership enforcement.
+- **Interactive Portfolio Demo Mode** (`portfolio-demo` branch, `VITE_DEMO_MODE=true`):
+  - Architecture: **React + Centralized Demo Adapter + IndexedDB** (`edent_portfolio_demo`), seeded on first visit from `edent-frontend/public/demo-seed.json` (`55` users, `6` groups, `12` teeth, `10` practical works, `32` group assignments, `54` submissions).
+  - **Passwordless Access (`/demo`)**: Visitors can explore as **Administrator**, **Professor**, or **Student** without entering a password or connecting to any backend.
+  - **Browser-Local Persistence**: Changes (activations, groups, students, PWs, tooth-image landmark submissions) persist in the visitor's own browser via IndexedDB across refreshes.
+  - **Role Switching & Reset**: An in-workspace demo bar lets visitors switch between Admin, Professor, and Student seamlessly or click **Reset demo data** (with confirmation) to restore the initial synthetic dataset.
+  - **Sample Tooth Images**: The Tooth Analysis Studio provides sample front/side tooth illustrations in demo mode so visitors can test 9-landmark geometry, scoring, and PDF export without uploading local files.
 
 ---
 
@@ -221,7 +238,7 @@ erDiagram
 
 ```mermaid
 flowchart TB
-  subgraph Demo["Active Portfolio Demo ($0.00 â€” portfolio-demo branch)"]
+  subgraph Demo["Active Portfolio Demo ($0.00 — portfolio-demo branch)"]
     VercelDemo["Vercel Hobby (edent)<br/>Root: edent-frontend/ | VITE_DEMO_MODE=true"] --> BrowserIDB["Visitor Browser<br/>Demo Adapter + IndexedDB + demo-seed.json"]
   end
 
@@ -268,7 +285,7 @@ flowchart TB
 
 ---
 
-## Local Installation â€” Full-Stack Mode (`ui-enhancement`)
+## Local Installation — Full-Stack Mode (`ui-enhancement`)
 
 Use the `ui-enhancement` branch to run the complete **React + Spring Boot + MySQL + JWT** application locally.
 
@@ -278,7 +295,7 @@ Use the `ui-enhancement` branch to run the complete **React + Spring Boot + MySQ
 - **Node.js** `18+` and **npm** (verified with Node `v22.13.1` / npm `10.9.2`)
 - **Java** `17+` (targets Java 17; verified with JDK `21.0.4`)
 - **MySQL** `8.x`
-- **Maven Wrapper** (`mvnw` / `mvnw.cmd` included in `edent-backend/` â€” no global Maven required)
+- **Maven Wrapper** (`mvnw` / `mvnw.cmd` included in `edent-backend/` — no global Maven required)
 
 ### Step-by-Step Setup
 
@@ -376,7 +393,7 @@ A root [`docker-compose.yml`](docker-compose.yml) is included for containerized 
 
 ---
 
-## Local Installation â€” Browser Portfolio Demo (`portfolio-demo`)
+## Local Installation — Browser Portfolio Demo (`portfolio-demo`)
 
 Run the interactive portfolio demo **without Java, Maven, or MySQL**:
 
@@ -421,35 +438,35 @@ Run the interactive portfolio demo **without Java, Maven, or MySQL**:
 
 ```text
 eDent/
-â”œâ”€â”€ edent-backend/                  # Spring Boot 3.2.0 REST API (Java 17)
-â”‚   â”œâ”€â”€ src/main/java/com/dentsbackend/
-â”‚   â”‚   â”œâ”€â”€ config/                 # ApiSecurityFilter (JWT, RBAC, demo guard) & CorsConfig
-â”‚   â”‚   â”œâ”€â”€ controllers/            # REST endpoints (User, Group, PW, Tooth, StudentPW, Health)
-â”‚   â”‚   â”œâ”€â”€ entities/               # JPA entities & JOINED inheritance hierarchy
-â”‚   â”‚   â”œâ”€â”€ repositories/           # Spring Data JPA repositories
-â”‚   â”‚   â”œâ”€â”€ services/               # Domain service layer
-â”‚   â”‚   â””â”€â”€ utils/                  # JwtTokenUtil, EmailSender, ResetPassword
-â”‚   â”œâ”€â”€ Dockerfile                  # Multi-stage Java 17 build (512 MB RAM tuned)
-â”‚   â”œâ”€â”€ mvnw / mvnw.cmd             # Maven Wrapper
-â”‚   â””â”€â”€ pom.xml
-â”œâ”€â”€ edent-frontend/                 # React 18 + Vite + Tailwind CSS SPA
-â”‚   â”œâ”€â”€ public/
-â”‚   â”‚   â”œâ”€â”€ demo-seed.json          # Sanitized seed dataset (portfolio-demo branch)
-â”‚   â”‚   â”œâ”€â”€ demo-samples/           # Sample tooth illustrations (portfolio-demo branch)
-â”‚   â”‚   â”œâ”€â”€ showcase/               # Application screenshots
-â”‚   â”‚   â””â”€â”€ favicon.svg             # Official eDent SVG brand mark
-â”‚   â”œâ”€â”€ src/
-â”‚   â”‚   â”œâ”€â”€ components/             # Role workspaces, demo welcome UI, shared UI kit
-â”‚   â”‚   â”œâ”€â”€ demo/                   # IndexedDB demoStore & demoAdapter (portfolio-demo branch)
-â”‚   â”‚   â”œâ”€â”€ layouts/                # AppShell & AuthLayout
-â”‚   â”‚   â”œâ”€â”€ pages/                  # LandingPage, DemoAccess
-â”‚   â”‚   â””â”€â”€ utils/                  # api.js, annotationCanvas.js, pdfExport.js
-â”‚   â”œâ”€â”€ vercel.json                 # React Router SPA rewrite configuration
-â”‚   â””â”€â”€ package.json
-â”œâ”€â”€ edent.sql                       # Sanitized synthetic MySQL demonstration dataset
-â”œâ”€â”€ docker-compose.yml              # Local multi-container setup
-â”œâ”€â”€ DEPLOYMENT.md                   # Zero-cost Vercel & optional full-stack deployment guide
-â””â”€â”€ README.md
+├── edent-backend/                  # Spring Boot 3.2.0 REST API (Java 17)
+│   ├── src/main/java/com/dentsbackend/
+│   │   ├── config/                 # ApiSecurityFilter (JWT, RBAC, demo guard) & CorsConfig
+│   │   ├── controllers/            # REST endpoints (User, Group, PW, Tooth, StudentPW, Health)
+│   │   ├── entities/               # JPA entities & JOINED inheritance hierarchy
+│   │   ├── repositories/           # Spring Data JPA repositories
+│   │   ├── services/               # Domain service layer
+│   │   └── utils/                  # JwtTokenUtil, EmailSender, ResetPassword
+│   ├── Dockerfile                  # Multi-stage Java 17 build (512 MB RAM tuned)
+│   ├── mvnw / mvnw.cmd             # Maven Wrapper
+│   └── pom.xml
+├── edent-frontend/                 # React 18 + Vite + Tailwind CSS SPA
+│   ├── public/
+│   │   ├── demo-seed.json          # Sanitized seed dataset (portfolio-demo branch)
+│   │   ├── demo-samples/           # Sample tooth illustrations (portfolio-demo branch)
+│   │   ├── showcase/               # Application screenshots
+│   │   └── favicon.svg             # Official eDent SVG brand mark
+│   ├── src/
+│   │   ├── components/             # Role workspaces, demo welcome UI, shared UI kit
+│   │   ├── demo/                   # IndexedDB demoStore & demoAdapter (portfolio-demo branch)
+│   │   ├── layouts/                # AppShell & AuthLayout
+│   │   ├── pages/                  # LandingPage, DemoAccess
+│   │   └── utils/                  # api.js, annotationCanvas.js, pdfExport.js
+│   ├── vercel.json                 # React Router SPA rewrite configuration
+│   └── package.json
+├── edent.sql                       # Sanitized synthetic MySQL demonstration dataset
+├── docker-compose.yml              # Local multi-container setup
+├── DEPLOYMENT.md                   # Zero-cost Vercel & optional full-stack deployment guide
+└── README.md
 ```
 
 ---
