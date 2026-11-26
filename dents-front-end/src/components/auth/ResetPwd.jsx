@@ -1,154 +1,106 @@
-import React, { useState } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import axios from 'axios';
+import { useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
+import AuthLayout from "../../layouts/AuthLayout";
+import Button from "../ui/Button";
+import FormField from "../ui/FormField";
+import { API_BASE } from "../../utils/api";
 
 const ResetPwd = () => {
-    const port = import.meta.env.VITE_PORT_SPRING || 5050;
-    const email = JSON.parse(localStorage.getItem("email"));
-    const code = JSON.parse(localStorage.getItem("code"));
-    const [isDarkMode, setIsDarkMode] = useState(false);
-    const [pwd, setpwd] = useState("");
-    const [pwd1, setpwd1] = useState("");
-    const [err, setErr] = useState("")
+  const email = JSON.parse(localStorage.getItem("email"));
+  const code = JSON.parse(localStorage.getItem("code"));
+  const [pwd, setPwd] = useState("");
+  const [pwd1, setPwd1] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState("");
 
-    const handleInputPw = (e) => {
-        setpwd(e.target.value)
-    };
-    const handleInputPw1 = (e) => {
-        setpwd1(e.target.value)
-    };
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!email || !code) {
+      toast.error("Your reset session is missing. Start the password reset again.");
+      return;
+    }
+    if (!pwd) {
+      setErr("Enter a new password.");
+      return;
+    }
+    if (pwd !== pwd1) {
+      setErr("The two passwords must be identical.");
+      return;
+    }
+    setSubmitting(true);
+    setErr("");
+    try {
+      const res = await axios.post(`${API_BASE}/users/resetpwd`, {
+        email,
+        code,
+        password: pwd,
+      });
+      toast.success(res.data.message);
+      localStorage.removeItem("email");
+      localStorage.removeItem("code");
+      setTimeout(() => {
+        window.location = "/login";
+      }, 1500);
+    } catch (error) {
+      const msg = error.response?.data?.message || "Could not reset the password.";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const toggleDarkMode = () => {
-        setIsDarkMode(!isDarkMode);
-    };
+  return (
+    <AuthLayout title="Set new password" subtitle="Choose a strong new password for your account.">
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        <FormField id="new-pwd" label="New password" required>
+          <input
+            id="new-pwd"
+            type="password"
+            value={pwd}
+            onChange={(e) => {
+              setPwd(e.target.value);
+              if (err) setErr("");
+            }}
+            placeholder="Enter new password"
+            className="block w-full rounded-lg border border-[#E2E8F0] px-3.5 py-2.5 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+          />
+        </FormField>
 
-    const notify = (mssg) => {
-        toast.success(`${mssg}`, {
-            position: 'bottom-right',
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: 'colored',
-        });
-    };
+        <FormField id="confirm-pwd" label="Confirm password" required>
+          <input
+            id="confirm-pwd"
+            type="password"
+            value={pwd1}
+            onChange={(e) => {
+              setPwd1(e.target.value);
+              if (err) setErr("");
+            }}
+            placeholder="Confirm new password"
+            className="block w-full rounded-lg border border-[#E2E8F0] px-3.5 py-2.5 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+          />
+        </FormField>
 
-    const submit = async () => {
-        if (!email || !code) {
-            toast.error('Your reset session is missing. Start the password reset again.');
-            return;
-        }
-        if (!pwd) {
-            setErr('Enter a new password');
-            return;
-        }
-        try {
-            console.log({
-                email: email,
-                code: code,
-                password: pwd
+        {err && (
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {err}
+          </p>
+        )}
 
-            });
-            if(pwd === pwd1){
-                const res = await axios.post(`http://localhost:${port}/api/users/resetpwd`, {
-                    email: email,
-                    code: code,
-                    password: pwd
-    
-                });
-                notify(res.data.message);
-                localStorage.removeItem("email")
-                localStorage.removeItem("code")
-                setTimeout(() => {
-                    window.location = '/login';
-                }, 3000);
-    
-            }else{
-                setErr('The two passwords must be identical')
-                setTimeout(() => {
-                    setErr('');
-                  }, 2000);
-            }
-            
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Could not reset the password.', {
-                position: 'bottom-right',
-                autoClose: 2000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: 'colored',
-            });
-        }
-    };
+        <Button type="submit" loading={submitting} className="w-full py-2.5">
+          Reset password
+        </Button>
 
-    return (
-        <div className={`${isDarkMode ? 'dark' : ''}`}>
-            <div className={`dark:bg-slate-900 bg-gray-100 flex h-full items-center py-16 min-h-screen font-[Poppins]`}>
-                <main className="w-full max-w-md mx-auto p-6">
-                    <div className="py-2 px-3 bg-white border border-gray-200 rounded-lg dark:bg-slate-900 dark:border-gray-700">
-                        <div className="text-center my-8">
-                            <h1 className="block text-2xl font-bold text-gray-800 dark:text-white">Confirm activation code </h1>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                Enter the activation code that you received in your email
-                            </p>
-                        </div>
-                        <div className="py-2 px-3 mb-8  bg-white border border-gray-300 rounded-lg dark:bg-slate-900 dark:border-gray-700" >
-                            <label for="password" class="block text-sm text-gray-600 mb-2 dark:text-white">New password</label>
-                            <input
-                                value={pwd}
-                                onChange={handleInputPw}
-                                className="block w-full text-center text-xl border-gray-300  rounded-md placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
-                                type="password"
-                                placeholder='------'
-                            />
-                            <label for="password" class="block text-sm text-gray-600 mb-2 dark:text-white">Confirm password</label>
-                            <input
-                                value={pwd1}
-                                onChange={handleInputPw1}
-                                className="block w-full text-center text-xl border-gray-300  rounded-md placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
-                                type="password"
-                                placeholder='------'
-                            />
-                            <a class="text-sm text-blue-600  decoration-2 hover:underline font-medium dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600" href="/login/">  login</a>
-                            {err && <p class="text-sm text-red-600 mt-2 text-center py-1 px-2 bg-red-200 rounded-md border border-red-600 " >{err}</p>}
-                        </div>
-                        <button
-                            onClick={submit}
-                            className="w-full mt-2 py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                        >
-                            Submit
-                        </button>
-                    </div>
-                    <div className="absolute top-4 right-4">
-                        <button
-                            onClick={toggleDarkMode}
-                            className="bg-gray-200 dark:bg-gray-700 rounded-full p-2 focus:outline-none focus:ring focus:border-blue-300"
-                        >
-                            {isDarkMode ? '🌞' : '🌙'}
-                        </button>
-                    </div>
-                </main>
-            </div>
-            <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-            />
+        <div className="text-center">
+          <Link to="/login" className="text-xs font-medium text-[#0F766E] hover:underline">
+            Back to sign in
+          </Link>
         </div>
-    );
+      </form>
+    </AuthLayout>
+  );
 };
 
-export default ResetPwd
+export default ResetPwd;

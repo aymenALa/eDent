@@ -1,26 +1,28 @@
-import React from 'react'
-import NotFound from '../../assets/notfound.jpg'
-const NotFound404 = () => {
-  return (
-    <div class="flex w-full min-h-screen  justify-center items-center">
-      
-  
-    
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCompass } from "@fortawesome/free-solid-svg-icons";
 
-      <div class="text-center py-32 px-4 sm:px-6 lg:px-8 w-2/3  rounded-l-lg justify-center flex flex-col items-center">
-        {/* <h1 class="block text-9xl font-bold text-sky-700 my-8 sm:text-9xl dark:text-white">404</h1> */}
-        <img src={NotFound} className='w-[400px] h-[400px] animate-bounce'/>
-        <p class="mt-3 text-gray-600 text-3xl dark:text-gray-400 font-semibold my-5 ">Oops, something went wrong.</p>
-        <p class="text-gray-600 text-xl dark:text-gray-400">Sorry, we couldn't find your page.</p>
-        <a href='/' className='text-white text-xl px-4 py-2 bg-sky-700 hover:bg-sky-800 rounded-lg my-8'>Go to home </a>
+const NotFound404 = () => (
+  <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-4 py-12 text-[#0F172A]">
+    <div className="w-full max-w-md rounded-xl border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[#0F766E]">
+        <FontAwesomeIcon icon={faCompass} className="h-6 w-6" aria-hidden="true" />
       </div>
-      
-
-    
-  
-
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[#0F766E]">Error 404</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0F172A]">
+        Oops, page not found
+      </h1>
+      <p className="mt-2 text-sm text-slate-600">
+        Sorry, we couldn&apos;t find the page you requested.
+      </p>
+      <Link
+        to="/"
+        className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#134E4A]"
+      >
+        Go to home
+      </Link>
     </div>
-  )
-}
+  </main>
+);
 
-export default NotFound404
+export default NotFound404;

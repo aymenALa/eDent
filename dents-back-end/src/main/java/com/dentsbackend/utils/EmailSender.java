@@ -1,6 +1,7 @@
 package com.dentsbackend.utils;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -9,11 +10,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class EmailSender {
 
-    @Autowired
+    @Autowired(required = false)
     private JavaMailSender mailSender;
+
+    @Value("${app.mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${app.demo.readonly:false}")
+    private boolean demoReadOnly;
 
     @Async
     public void sendEmail(String to, String subject, String body) {
+        if (!mailEnabled || demoReadOnly || mailSender == null) {
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
         message.setSubject(subject);

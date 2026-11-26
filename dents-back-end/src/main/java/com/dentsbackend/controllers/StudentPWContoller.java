@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/studentpws")
-@CrossOrigin(origins = "*")
+
 public class StudentPWContoller {
     @Autowired
     StudentPWService studentPWService;

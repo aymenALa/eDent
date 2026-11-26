@@ -1,360 +1,362 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faPen, faClose, faAdd } from '@fortawesome/free-solid-svg-icons';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPaperclip, faPen, faPlus, faTrash, faXmark } from "@fortawesome/free-solid-svg-icons";
+import PageHeader from "../ui/PageHeader";
+import SearchInput from "../ui/SearchInput";
+import DataTable from "../ui/DataTable";
+import StatusBadge from "../ui/StatusBadge";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import FormField from "../ui/FormField";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
+import { API_BASE, authHeaders, getAuthUser, useDemoMode } from "../../utils/api";
+
+const EMPTY_GROUP = { id: "", code: "", year: "" };
+
 const Group = () => {
-    const port = import.meta.env.VITE_PORT_SPRING;
-    const [groups, setGroups] = useState([]);
-    const [group, setGroup] = useState({
-        id: '',
-        code: '',
-        year: ''
-    });
-    const [loading, setLoading] = useState(false);
-    const [modal, setModal] = useState(false);
-    const [modalDel, setModalDel] = useState(false);
-    const [updateMode, setUpdateMode] = useState(false);
-    const [addpwMode, setAddPwMode] = useState(false)
-    const [pwId, setPwId] = useState("")
-    const [pws, setPws] = useState([])
-    const url = `http://localhost:${port}/api/groups`;
-    const userlogin = JSON.parse(localStorage.getItem("userlogin"))
-    const notify = (mssg) => {
-        toast.success(`${mssg}`, {
-            position: 'bottom-right',
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: 'colored',
-        });
-    };
+  const userlogin = getAuthUser() || {};
+  const demoReadOnly = useDemoMode();
+  const [groups, setGroups] = useState([]);
+  const [pws, setPws] = useState([]);
+  const [group, setGroup] = useState(EMPTY_GROUP);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [updateMode, setUpdateMode] = useState(false);
+  const [pwModalGroup, setPwModalGroup] = useState(null);
+  const [pwId, setPwId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-    const fetchGroups = async () => {
-        setLoading(true);
-        const rep = await axios.get(`${url}/professor/${userlogin.id}`);
-        setGroups(rep.data);
-        setLoading(false);
-    };
-
-    const fetshPws = async () => {
-        setLoading(true)
-        const rep = await axios.get(`http://localhost:${port}/api/pws/all`)
-        setPws(rep.data)
-        setLoading(false)
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [grpRes, pwRes] = await Promise.all([
+        axios.get(`${API_BASE}/groups/professor/${userlogin.id}`),
+        axios.get(`${API_BASE}/pws/all`),
+      ]);
+      setGroups(Array.isArray(grpRes.data) ? grpRes.data : []);
+      setPws(Array.isArray(pwRes.data) ? pwRes.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load groups.");
+    } finally {
+      setLoading(false);
     }
+  }, [userlogin.id]);
 
-    useEffect(() => {
-        fetchGroups();
-        fetshPws()
-    }, []);
+  useEffect(() => {
+    if (userlogin.id) loadData();
+  }, [loadData, userlogin.id]);
 
-    const handleGroup = (e) => {
-        setGroup({ ...group, [e.target.name]: e.target.value });
-    };
-
-    const handlePw = (e) => {
-        setPwId(e.target.value)
+  const handleSaveGroup = async (e) => {
+    e.preventDefault();
+    if (!group.code.trim() || !group.year.trim()) {
+      toast.error("Group code and academic year are required.");
+      return;
     }
-
-    const handleUpdate = (gr) => {
-        setGroup(gr)
-        setUpdateMode(true)
-        openModal()
+    setSaving(true);
+    try {
+      if (updateMode) {
+        const rep = await axios.put(`${API_BASE}/groups/update/${group.id}`, group);
+        toast.success(rep.data?.message || "Group updated successfully.");
+      } else {
+        const rep = await axios.post(`${API_BASE}/groups/add/${userlogin.id}`, group);
+        toast.success(rep.data?.message || "Group created successfully.");
+      }
+      setModalOpen(false);
+      setGroup(EMPTY_GROUP);
+      setUpdateMode(false);
+      await loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not save group.");
+    } finally {
+      setSaving(false);
     }
-    const handlePwMode = (gr) => {
-        setGroup(gr)
-        setAddPwMode(true)
-        openModal()
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const rep = await axios.delete(`${API_BASE}/groups/delete/${deleteTarget.id}`, {
+        headers: authHeaders(),
+      });
+      toast.success(rep.data?.message || "Group deleted successfully.");
+      setDeleteTarget(null);
+      await loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not delete this group.");
+    } finally {
+      setDeleting(false);
     }
-    const handleDelete = (id) => {
-        setGroup((current) => ({ ...current, id }))
-        openModaldel()
+  };
+
+  const assignPw = async () => {
+    if (!pwModalGroup || !pwId) return;
+    try {
+      const rep = await axios.post(`${API_BASE}/groups/pw/${pwModalGroup.id}/${pwId}`);
+      setPwModalGroup(rep.data);
+      setPwId("");
+      toast.success("Practical work assigned.");
+      await loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not assign practical work.");
     }
+  };
 
-    const addGroup = async () => {
-        const rep = await axios.post(`${url}/add/${userlogin.id}`, group)
-        notify(rep.data.message)
-        setGroup({
-            id: '',
-            code: '',
-            year: ''
-        })
-        fetchGroups();
-        closeModal()
+  const removePw = async (groupId, targetPwId) => {
+    try {
+      const rep = await axios.delete(`${API_BASE}/groups/pw/${groupId}/${targetPwId}`);
+      setPwModalGroup(rep.data);
+      toast.success("Practical work removed.");
+      await loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not remove practical work.");
     }
-    const updateGroup = async () => {
-        const rep = await axios.put(`${url}/update/${group.id}`, group)
-        notify(rep.data.message)
-        setGroup({
-            id: '',
-            code: '',
-            year: ''
-        })
-        fetchGroups()
-        closeModal()
-        setUpdateMode(false)
-    }
-    const deleteGroup = async () => {
-        try {
-            const rep = await axios.delete(`${url}/delete/${group.id}`, {
-                headers: { Authorization: `Bearer ${userlogin.token}` }
-            })
-            notify(rep.data.message)
-            closeModaldel()
-            fetchGroups();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Could not delete this group.')
-        }
-    }
+  };
 
-    const addPw = async () => {
-        try {
-            const rep = await axios.post(`${url}/pw/${group.id}/${pwId}`)
-            setGroup(rep.data)
-            console.log(rep.data)
-            fetchGroups
-        } catch (error) {
-            console.log(error)
-        }
-    }
-    const deletePw = async (idG, idP) => {
-        try {
-            const rep = await axios.delete(`${url}/pw/${idG}/${idP}`)
-            setGroup(rep.data)
-            fetchGroups()
-            setPwId("")
-            console.log(rep.data)
-        } catch (error) {
-            console.log(error)
-        }
-    }
-
-    const openModal = () => {
-        setModal(true);
-    };
-
-    const closeModal = () => {
-        fetchGroups()
-        setModal(false);
-        setGroup({
-            id: '',
-            code: '',
-            year: ''
-        })
-        setUpdateMode(false)
-        setAddPwMode(false)
-        
-    };
-    const openModaldel = () => {
-        setModalDel(true);
-    };
-
-    const closeModaldel = () => {
-        setModalDel(false);
-        setGroup({
-            id: '',
-            code: '',
-            year: ''
-        })
-    };
-
-    return (
-        <div className="w-full mt-20">
-            {loading ? (
-                <p></p>
-            ) : (
-                <>
-                    <div class="flex flex-col w-full border p-10 border-gray-200 rounded-xl bg-white">
-                        <button type="button" class="w-1/6 mb-1  py-3 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:pointer-events-none dark:hover:bg-blue-900 dark:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                            onClick={openModal}>
-                            <FontAwesomeIcon icon={faPlus} />
-                            Add new group
-                        </button>
-
-                        <div class="-m-1.5 overflow-x-auto">
-                            <div class="p-1.5 min-w-full inline-block align-middle">
-                                <div class="overflow-hidden rounded-t-2xl">
-                                    <table class="min-w-full divide-y mt-1 divide-gray-200 dark:divide-gray-700">
-                                        <thead className='bg-gray-200 '>
-                                            <tr>
-                                                <th scope="col" class="px-8 py-3 text-start text-xs font-medium text-gray-500 uppercase">Id</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">code</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">Year</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">Pws's list</th>
-                                                <th scope="col" class="pl-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Add-Pw</th>
-                                                <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Delete</th>
-                                                <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Update</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {groups.map((group, index) => (
-                                                <tr>
-                                                    <td class="px-8 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">{group.id}</td>
-                                                    <td class="pl-32 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{group.code}</td>
-                                                    <td class="pl-32 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{group.year}</td>
-                                                    <td class="flex items-center gap-2  pl-32 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                                                        {group.pws.length !== 0 ? group.pws.map((pw, index) => (
-                                                            <span className='flex justify-center items-center text-sm  px-1 py-0.5 rounded-lg border border-gray-500 text-gray-500 bg-gray-200'>
-                                                                {pw.title}
-                                                                <FontAwesomeIcon onClick={() => deletePw(group.id, pw.id)} icon={faClose} className='ml-3 hover:bg-gray-500 hover:text-gray-100 p-0.5 rounded-full h-5 w-5' />
-                                                            </span>
-                                                        )) : 
-                                                        <p>{console.log(group)}no pws</p>}
-                                                    </td>
-                                                    <td class="px-2 py-4 whitespace-nowrap text-end text-sm font-medium">
-                                                        <button type="button" class="inline-flex items-center pr-3 gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                                                            onClick={() => handlePwMode(group)}>
-                                                            <FontAwesomeIcon icon={faAdd} />
-                                                        </button>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                                                        <button type="button" class="inline-flex items-center pr-3 gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                                                            onClick={() => handleDelete(group.id)}>
-                                                            <FontAwesomeIcon icon={faTrash} />
-                                                        </button>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                                                        <button type="button" class="inline-flex items-center pr-3 gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                                                            onClick={() => handleUpdate(group)}>
-                                                            <FontAwesomeIcon icon={faPen} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-                    {modal && (
-                        <div className="w-full h-full fixed top-0 left-0 z-[60] bg-black bg-opacity-60 flex justify-center items-center">
-                            <div className="bg-white w-full max-w-md p-4 rounded-xl p-5">
-                                {!addpwMode &&
-                                    <div>
-                                        <h3 className="font-bold text-gray-800 mb-3 text-center">
-                                            {updateMode ? 'Update' : 'Add'} group
-                                        </h3>
-                                        <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Code</label>
-                                        <input type="email" id="input-label"
-                                            name='code'
-                                            value={group.code}
-                                            onChange={handleGroup}
-                                            class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="code" />
-                                        <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Year</label>
-                                        <input type="email" id="input-label"
-                                            name='year'
-                                            value={group.year}
-                                            onChange={handleGroup}
-                                            class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="year" />
-                                    </div>}
-                                {addpwMode &&
-                                    <div className='flex flex-col items-center justify-center p-3 mt-3 '>
-                                        <div className='flex justify-center w-full items-center gap-3 mt-3'>
-                                            <select value={pwId} onChange={handlePw} class="py-3 w-1/3 px-4 pe-9 block border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
-                                                <option selected>Select pw</option>
-                                                {pws.map((pw, index) => (
-                                                    <option value={pw.id}>{pw.title}</option>
-                                                ))}
-                                            </select>
-                                            <button onClick={addPw} className='flex items-center text-white px-5 py-1 rounded-md bg-green-500 hover:bg-green-700'>
-                                                <FontAwesomeIcon icon={faPlus} />
-                                                <p className='ml-2 '>add pw</p>
-                                            </button>
-
-                                        </div>
-                                        {group.pws.lenght !== 0 &&
-                                            <div className='grid grid-cols-3 gap-4 pt-4'>
-                                                {group.pws.map((pw, index) => (
-                                                    <span className='flex justify-center items-center px-2 py-0.5 rounded-lg border border-gray-500 text-gray-500 bg-gray-200'>
-                                                        {pw.title}
-                                                        <FontAwesomeIcon onClick={deletePw} icon={faClose} className='ml-3 hover:bg-gray-500 hover:text-gray-100 p-0.5 rounded-full h-5 w-5' />
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        }
-                                    </div>
-                                }
-                                <div className="flex justify-end mt-4">
-                                    <button
-                                        type="button"
-                                        className="py-2 px-3 mr-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50"
-                                        onClick={closeModal}
-                                    >
-                                        Close
-                                    </button>
-                                    {!addpwMode &&
-                                        <button
-                                            type="button"
-                                            className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700"
-                                            onClick={updateMode ? updateGroup : addGroup}
-                                        >
-                                            {updateMode ? 'update' : 'add'}
-                                        </button>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-            {modalDel && (
-                <div
-                    className="w-full h-full fixed top-0 left-0 z-[60] bg-black bg-opacity-50 flex justify-center items-center">
-                    <div className="flex flex-col items-center bg-white w-full max-w-md rounded-xl p-5">
-                        <h3 className="font-bold text-xl text-gray-800 mb-3 text-center">
-                            Delete group
-                        </h3>
-                        <span class=" flex-shrink-0 inline-flex justify-center items-center mb-2 sm:w-[62px] sm:h-[62px] rounded-full border-4 border-red-50 bg-red-100 text-red-500 dark:bg-red-700 dark:border-red-600 dark:text-red-100">
-                            <svg class="flex-shrink-0 w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
-                            </svg>
-                        </span>
-                        <h3 className="text-center text-sm text-gray-600 mb-3 ">
-                            Are you sure you want to delete this group?
-                        </h3>
-
-                        <div className="flex justify-end mt-4">
-                            <button
-                                type="button"
-                                className="py-2 px-3 mr-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50"
-                                onClick={closeModaldel}
-                            >
-                                close
-                            </button>
-                            <button
-                                type="button"
-                                className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700"
-                                onClick={deleteGroup}
-                            >
-                                delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-            />
-        </div>
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter(
+      (g) =>
+        (g.code && g.code.toLowerCase().includes(q)) ||
+        (g.year && String(g.year).toLowerCase().includes(q))
     );
+  }, [groups, search]);
 
-}
+  const columns = [
+    { key: "code", label: "Group code", render: (g) => <span className="font-semibold">{g.code}</span> },
+    { key: "year", label: "Academic year", render: (g) => <span className="text-slate-600">{g.year}</span> },
+    {
+      key: "students",
+      label: "Students",
+      render: (g) => <StatusBadge tone="neutral">{g.student?.length || 0} enrolled</StatusBadge>,
+    },
+    {
+      key: "pws",
+      label: "Practical works",
+      render: (g) => <StatusBadge tone="teal">{g.pws?.length || 0} assigned</StatusBadge>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (g) => (
+        <div className="inline-flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setPwModalGroup(g);
+              setPwId("");
+            }}
+          >
+            <FontAwesomeIcon icon={faPaperclip} className="h-3 w-3" aria-hidden="true" />
+            Assign PWs
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setGroup({ id: g.id, code: g.code || "", year: g.year || "" });
+              setUpdateMode(true);
+              setModalOpen(true);
+            }}
+          >
+            <FontAwesomeIcon icon={faPen} className="h-3 w-3" aria-hidden="true" />
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={demoReadOnly}
+            title={demoReadOnly ? "Disabled in public demo mode" : undefined}
+            onClick={() => setDeleteTarget(g)}
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            <FontAwesomeIcon icon={faTrash} className="h-3 w-3" aria-hidden="true" />
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
-export default Group
+  return (
+    <div>
+      <PageHeader
+        title="Groups"
+        description="Organize student cohorts and assign practical-work modules to each group."
+        actions={
+          <Button
+            disabled={demoReadOnly}
+            title={demoReadOnly ? "Disabled in public demo mode" : undefined}
+            onClick={() => {
+              setGroup(EMPTY_GROUP);
+              setUpdateMode(false);
+              setModalOpen(true);
+            }}
+          >
+            <FontAwesomeIcon icon={faPlus} className="h-3.5 w-3.5" aria-hidden="true" />
+            Add group
+          </Button>
+        }
+      />
+
+      <div className="mb-4">
+        <SearchInput
+          id="prof-group-search"
+          label="Search groups"
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by group code or year..."
+          className="sm:w-72"
+        />
+      </div>
+
+      {loading ? (
+        <LoadingState label="Loading groups..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={loadData} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(g) => g.id}
+          emptyState={
+            <EmptyState
+              title="No groups found"
+              description="Create a group to enroll students and assign practical work."
+            />
+          }
+        />
+      )}
+
+      {/* Create / Edit Group */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={updateMode ? "Edit group" : "Create group"}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" form="group-form" loading={saving}>
+              {updateMode ? "Save changes" : "Create group"}
+            </Button>
+          </>
+        }
+      >
+        <form id="group-form" onSubmit={handleSaveGroup} className="space-y-4">
+          <FormField id="grp-code" label="Group code" required>
+            <input
+              id="grp-code"
+              name="code"
+              value={group.code}
+              onChange={(e) => setGroup((g) => ({ ...g, code: e.target.value }))}
+              placeholder="e.g. GRP-DENT-01"
+              required
+              className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+            />
+          </FormField>
+          <FormField id="grp-year" label="Academic year" required>
+            <input
+              id="grp-year"
+              name="year"
+              value={group.year}
+              onChange={(e) => setGroup((g) => ({ ...g, year: e.target.value }))}
+              placeholder="e.g. 2026"
+              required
+              className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+            />
+          </FormField>
+        </form>
+      </Modal>
+
+      {/* Assign PWs Modal */}
+      <Modal
+        open={Boolean(pwModalGroup)}
+        onClose={() => setPwModalGroup(null)}
+        title={pwModalGroup ? `Practical works — ${pwModalGroup.code}` : "Assign practical works"}
+        size="md"
+        footer={
+          <Button variant="secondary" onClick={() => setPwModalGroup(null)}>
+            Done
+          </Button>
+        }
+      >
+        {pwModalGroup && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <select
+                aria-label="Select practical work to assign"
+                value={pwId}
+                onChange={(e) => setPwId(e.target.value)}
+                className="flex-1 rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              >
+                <option value="">Select practical work...</option>
+                {pws.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              <Button onClick={assignPw} disabled={!pwId}>
+                Assign
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Currently assigned ({pwModalGroup.pws?.length || 0})
+              </p>
+              {!pwModalGroup.pws?.length ? (
+                <p className="text-sm text-slate-500">No practical work assigned to this group yet.</p>
+              ) : (
+                <ul className="divide-y divide-[#E2E8F0] rounded-lg border border-[#E2E8F0]">
+                  {pwModalGroup.pws.map((assigned) => (
+                    <li
+                      key={assigned.id}
+                      className="flex items-center justify-between px-3.5 py-2.5 text-sm"
+                    >
+                      <span className="font-medium text-[#0F172A]">{assigned.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePw(pwModalGroup.id, assigned.id)}
+                        aria-label={`Remove ${assigned.title}`}
+                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <FontAwesomeIcon icon={faXmark} className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title="Delete group"
+        message={deleteTarget ? `Delete group ${deleteTarget.code} and its assignments?` : ""}
+        confirmLabel="Delete group"
+      />
+    </div>
+  );
+};
+
+export default Group;
