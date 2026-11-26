@@ -79,6 +79,7 @@ const Professors = () => {
       setConfirmTarget(null);
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not delete this professor.");
+      setConfirmTarget(null);
     } finally {
       setDeleting(false);
     }

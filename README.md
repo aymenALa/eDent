@@ -464,7 +464,8 @@ eDent/
   - Frontend production builds pass cleanly for both `VITE_DEMO_MODE=true` (`502` modules) and `VITE_DEMO_MODE=false`.
   - `npm run lint` passes with zero errors in all modernized/demo files (`27` pre-existing lint issues remain in untouched legacy template files).
   - Backend `mvnw.cmd clean test` (`DentsBackEndApplicationTests`) and HTTP security/CORS/RBAC checks passed against the isolated `edent_test` MySQL 8.2 database.
-  - The interactive portfolio demo was manually tested and accepted by the product owner; automated headless Chrome attachment was unavailable locally because Chrome remote debugging (`DevToolsActivePort`) was not enabled.
+  - Automated demo regression tests (`npm test` via `node --test tests/demoAdapter.test.mjs`): `5/5` passed (seed integrity, tooth dependency checks, `StudentPWPK` submission matching, PW group assignment/unassignment propagation, and profile persistence).
+  - Real headless Chrome CDP end-to-end verification against the `VITE_DEMO_MODE=true` production bundle (`vite preview`) passed all workflows (floating welcome card, 7-viewport role switcher, continuous modal typing, tooth deletion guards, PW assignment → student 9-landmark submission → professor `SubmissionReview` + PDF export, sidebar profile sync, demo reset, and `0` external API calls), followed by product owner manual acceptance.
 - **Limitations & Historical Note**:
   - Geometric angles and `scoreAngles` values are educational prototypes, not clinically validated medical metrics.
   - Pre-modernization commits in `main` history remain preserved (not rewritten); any previously committed development credentials should be rotated.

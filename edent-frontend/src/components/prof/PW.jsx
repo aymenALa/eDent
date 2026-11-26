@@ -91,6 +91,8 @@ const PW = () => {
       await loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not delete practical work.");
+      setDeleteTarget(null);
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }

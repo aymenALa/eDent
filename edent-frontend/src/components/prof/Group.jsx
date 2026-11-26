@@ -92,6 +92,8 @@ const Group = () => {
       await loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not delete this group.");
+      setDeleteTarget(null);
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }
@@ -304,11 +306,14 @@ const Group = () => {
                 className="flex-1 rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
               >
                 <option value="">Select practical work...</option>
-                {pws.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                  </option>
-                ))}
+                {pws.map((item) => {
+                  const alreadyAssigned = pwModalGroup.pws?.some((p) => Number(p.id) === Number(item.id));
+                  return (
+                    <option key={item.id} value={item.id} disabled={alreadyAssigned}>
+                      {item.title}{alreadyAssigned ? " (already assigned)" : ""}
+                    </option>
+                  );
+                })}
               </select>
               <Button onClick={assignPw} disabled={!pwId}>
                 Assign

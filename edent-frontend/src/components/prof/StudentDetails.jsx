@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
+import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
@@ -61,7 +62,9 @@ const StudentDetails = ({ id }) => {
     const notes = [];
     for (const pw of pws) {
       labels.push(pw.title);
-      const match = submissions.find((s) => s.id?.pw_id === pw.id);
+      const match = submissions.find(
+        (s) => s.id?.pw_id === pw.id || s.id?.pwId === pw.id || s.pw?.id === pw.id
+      );
       notes.push(match ? formatScore((match.noteSide || 0) + (match.noteFront || 0)) : 0);
     }
     return { labels, notes };
@@ -69,8 +72,14 @@ const StudentDetails = ({ id }) => {
 
   const openSubmissionModal = (pwItem) => {
     const submissions = student?.studentPWS || [];
-    const found = submissions.find((s) => s.id?.pw_id === pwItem.id) || null;
-    if (!found) return;
+    const found =
+      submissions.find(
+        (s) => s.id?.pw_id === pwItem.id || s.id?.pwId === pwItem.id || s.pw?.id === pwItem.id
+      ) || null;
+    if (!found) {
+      toast.error("Submission record could not be loaded for this practical work.");
+      return;
+    }
     setSelectedPw(pwItem);
     setStudentPw(found);
     setModalOpen(true);

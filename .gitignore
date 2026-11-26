@@ -3,3 +3,5 @@
 **/.env
 *.log
 tidb-ca.pem
+.vite/
+**/.vite/
