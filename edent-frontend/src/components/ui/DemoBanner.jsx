@@ -54,15 +54,15 @@ const DemoBanner = () => {
         <div
           role="status"
           data-testid="interactive-demo-banner"
-          className="mb-5 flex flex-col gap-3 rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-3 text-xs text-teal-950 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-3 text-xs text-teal-950 shadow-sm xl:flex-row xl:items-center xl:justify-between"
         >
-          <div className="flex items-start gap-2.5">
+          <div className="flex min-w-0 items-start gap-2.5">
             <FontAwesomeIcon
               icon={faCircleInfo}
               className="mt-0.5 h-4 w-4 shrink-0 text-[#0F766E]"
               aria-hidden="true"
             />
-            <div>
+            <div className="min-w-0">
               <span className="font-semibold">
                 Interactive Demo — Data and changes are stored locally in your browser.
               </span>{" "}
@@ -72,8 +72,12 @@ const DemoBanner = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-teal-200 bg-white p-0.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Switch demo role"
+              className="inline-flex shrink-0 flex-wrap items-center rounded-lg border border-teal-200 bg-white p-0.5"
+            >
               {ROLE_OPTIONS.map((item) => {
                 const active = currentUser?.role === item.key;
                 return (
@@ -83,7 +87,7 @@ const DemoBanner = () => {
                     disabled={active || Boolean(switchingRole)}
                     onClick={() => handleSwitch(item.key)}
                     data-testid={`switch-role-${item.key}`}
-                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    className={`shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                       active
                         ? "bg-[#0F766E] text-white"
                         : "text-slate-600 hover:bg-teal-50 hover:text-[#0F766E]"
@@ -99,7 +103,7 @@ const DemoBanner = () => {
               type="button"
               onClick={() => setConfirmReset(true)}
               data-testid="reset-demo-btn"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0F766E] transition-colors hover:bg-teal-100/60"
+              className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0F766E] transition-colors hover:bg-teal-100/60"
             >
               <FontAwesomeIcon icon={faRotateLeft} className="h-3 w-3" aria-hidden="true" />
               Reset demo data

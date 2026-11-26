@@ -78,6 +78,8 @@ const Tooth = () => {
       await fetchTeeth();
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not delete this tooth.");
+      setDeleteTarget(null);
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }

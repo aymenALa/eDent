@@ -54,6 +54,16 @@ const ProfHome = () => {
   const [prof, setProf] = useState(userlogin);
 
   useEffect(() => {
+    const onUserUpdated = (event) => {
+      if (event?.detail) {
+        setProf((prev) => ({ ...(prev || {}), ...event.detail }));
+      }
+    };
+    window.addEventListener("edent:user-updated", onUserUpdated);
+    return () => window.removeEventListener("edent:user-updated", onUserUpdated);
+  }, []);
+
+  useEffect(() => {
     if (!userlogin?.id) return;
     let active = true;
     axios
@@ -66,6 +76,16 @@ const ProfHome = () => {
       active = false;
     };
   }, [userlogin?.id]);
+
+  useEffect(() => {
+    const onUserUpdated = (event) => {
+      if (event?.detail) {
+        setProf((prev) => ({ ...(prev || {}), ...event.detail }));
+      }
+    };
+    window.addEventListener("edent:user-updated", onUserUpdated);
+    return () => window.removeEventListener("edent:user-updated", onUserUpdated);
+  }, []);
 
   const ActiveView = VIEWS[componentName];
   if (!ActiveView) {

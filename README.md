@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="edent-frontend/public/favicon.svg" alt="eDent logo" width="68" height="68" />
 </p>
 
@@ -47,9 +47,9 @@
 
 ## Application Modes
 
-eDent supports two distinct runtime modes:
+eDent supports two distinct runtime modes controlled by `VITE_DEMO_MODE`:
 
-- **Full-Stack Mode** (`ui-enhancement` branch, `VITE_DEMO_MODE=false` or unset):
+- **Full-Stack Mode** (`ui-enhancement` / `main`, `VITE_DEMO_MODE=false` or unset):
   - Architecture: **React + Spring Boot + MySQL/TiDB + JWT authentication**.
   - Requires a running backend and database; uses real password/BCrypt login, JWT tokens, and server-side role/ownership enforcement.
 - **Interactive Portfolio Demo Mode** (`portfolio-demo` branch, `VITE_DEMO_MODE=true`):
@@ -419,8 +419,9 @@ Run the interactive portfolio demo **without Java, Maven, or MySQL**:
    VITE_DEMO_MODE=true npm run dev
    ```
 
-3. **Build production bundle**:
+3. **Build production bundle & run regression tests**:
    ```bash
+   npm test
    npm run build
    ```
 
@@ -451,16 +452,17 @@ eDent/
 │   └── pom.xml
 ├── edent-frontend/                 # React 18 + Vite + Tailwind CSS SPA
 │   ├── public/
-│   │   ├── demo-seed.json          # Sanitized seed dataset (portfolio-demo branch)
-│   │   ├── demo-samples/           # Sample tooth illustrations (portfolio-demo branch)
+│   │   ├── demo-seed.json          # Sanitized seed dataset (portfolio-demo)
+│   │   ├── demo-samples/           # Sample tooth illustrations (portfolio-demo)
 │   │   ├── showcase/               # Application screenshots
 │   │   └── favicon.svg             # Official eDent SVG brand mark
 │   ├── src/
 │   │   ├── components/             # Role workspaces, demo welcome UI, shared UI kit
-│   │   ├── demo/                   # IndexedDB demoStore & demoAdapter (portfolio-demo branch)
+│   │   ├── demo/                   # IndexedDB demoStore & centralized demoAdapter
 │   │   ├── layouts/                # AppShell & AuthLayout
 │   │   ├── pages/                  # LandingPage, DemoAccess
 │   │   └── utils/                  # api.js, annotationCanvas.js, pdfExport.js
+│   ├── tests/                      # Automated regression tests (demoAdapter.test.mjs)
 │   ├── vercel.json                 # React Router SPA rewrite configuration
 │   └── package.json
 ├── edent.sql                       # Sanitized synthetic MySQL demonstration dataset
@@ -481,7 +483,8 @@ eDent/
   - Frontend production builds pass cleanly for both `VITE_DEMO_MODE=true` (`502` modules) and `VITE_DEMO_MODE=false`.
   - `npm run lint` passes with zero errors in all modernized/demo files (`27` pre-existing lint issues remain in untouched legacy template files).
   - Backend `mvnw.cmd clean test` (`DentsBackEndApplicationTests`) and HTTP security/CORS/RBAC checks passed against the isolated `edent_test` MySQL 8.2 database.
-  - The interactive portfolio demo was manually tested and accepted by the product owner; automated headless Chrome attachment was unavailable locally because Chrome remote debugging (`DevToolsActivePort`) was not enabled.
+  - Automated demo regression tests (`npm test` via `node --test tests/demoAdapter.test.mjs`): `5/5` passed (seed integrity, tooth dependency checks, `StudentPWPK` submission matching, PW group assignment/unassignment propagation, and profile persistence).
+  - Real headless Chrome CDP end-to-end verification against the `VITE_DEMO_MODE=true` production bundle (`vite preview`) passed all workflows (floating welcome card, 7-viewport role switcher, continuous modal typing, tooth deletion guards, PW assignment → student 9-landmark submission → professor `SubmissionReview` + PDF export, sidebar profile sync, demo reset, and `0` external API calls), followed by product owner manual acceptance.
 - **Limitations & Historical Note**:
   - Geometric angles and `scoreAngles` values are educational prototypes, not clinically validated medical metrics.
   - Pre-modernization commits in `main` history remain preserved (not rewritten); any previously committed development credentials should be rotated.

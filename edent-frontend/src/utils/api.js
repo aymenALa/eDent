@@ -25,6 +25,10 @@ export const getAuthUser = () => {
 
 export const setAuthUser = (user) => {
   localStorage.setItem("userlogin", JSON.stringify(user));
+  window.dispatchEvent(new CustomEvent("edent:user-updated", { detail: user }));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("edent:user-updated", { detail: user }));
+  }
 };
 
 export const clearAuthUser = () => {

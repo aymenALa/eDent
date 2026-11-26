@@ -9,7 +9,7 @@ import Button from "../ui/Button";
 import FormField from "../ui/FormField";
 import StatusBadge from "../ui/StatusBadge";
 import { ErrorState, LoadingState } from "../ui/States";
-import { API_BASE, getAuthUser } from "../../utils/api";
+import { API_BASE, getAuthUser, setAuthUser } from "../../utils/api";
 
 const Profil = () => {
   const userlogin = getAuthUser() || {};
@@ -79,6 +79,16 @@ const Profil = () => {
     setSaving(true);
     try {
       await axios.put(`${API_BASE}/users/update/professor/${user.id}`, user);
+      setAuthUser({ ...getAuthUser(), firstName: user.firstName, lastName: user.lastName, userName: user.userName, email: user.email, grade: user.grade, photo: user.photo });
+      setAuthUser({
+        ...getAuthUser(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userName: user.userName,
+        email: user.email,
+        grade: user.grade,
+        photo: user.photo,
+      });
       toast.success("Profile updated successfully.");
       setEditing(false);
       await getProfessor();

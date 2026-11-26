@@ -15,16 +15,20 @@ const Modal = ({ open, onClose, title, subtitle, size = "md", children, footer, 
   const titleId = useId();
   const dialogRef = useRef(null);
   const previousFocus = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     previousFocus.current = document.activeElement;
     const handleKey = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current?.();
     };
     window.addEventListener("keydown", handleKey);
     const timer = window.setTimeout(() => {
-      dialogRef.current?.focus();
+      if (dialogRef.current && !dialogRef.current.contains(document.activeElement)) {
+        dialogRef.current.focus();
+      }
     }, 0);
     return () => {
       window.clearTimeout(timer);
@@ -33,7 +37,7 @@ const Modal = ({ open, onClose, title, subtitle, size = "md", children, footer, 
         previousFocus.current.focus();
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -41,7 +45,7 @@ const Modal = ({ open, onClose, title, subtitle, size = "md", children, footer, 
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) onCloseRef.current?.();
       }}
     >
       <div
@@ -62,7 +66,7 @@ const Modal = ({ open, onClose, title, subtitle, size = "md", children, footer, 
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onCloseRef.current?.()}
             aria-label="Close dialog"
             className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >

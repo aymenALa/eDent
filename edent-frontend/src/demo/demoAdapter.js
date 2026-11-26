@@ -5,7 +5,7 @@ import {
   getNextId,
   getRecord,
   putRecord,
-} from "./demoStore";
+} from "./demoStore.js";
 
 async function loadSnapshot() {
   await ensureDemoSeeded();
@@ -74,7 +74,7 @@ function hydrateStudentPW(spw, snap) {
   const pw = snap.pwsMap.get(Number(spw.pwId));
   const student = snap.usersMap.get(Number(spw.studentId));
   return {
-    id: { studentId: spw.studentId, pwId: spw.pwId },
+    id: { student_id: spw.studentId, pw_id: spw.pwId },
     student: student
       ? {
           id: student.id,
@@ -388,16 +388,34 @@ export async function handleDemoRequest(method, url, rawBody) {
     const parts = path.split("/");
     const pwId = Number(parts.pop());
     const groupeId = Number(parts.pop());
-    await putRecord("groupPws", { key: `${groupeId}_${pwId}`, groupeId, pwId });
-    return { status: 200, data: { message: "PW assigned to group successfully" } };
+    const group = snap.groupsMap.get(groupeId);
+    const pw = snap.pwsMap.get(pwId);
+    if (!group || !pw) {
+      return { status: 404, data: { message: "Group or practical work not found." } };
+    }
+    const key = `${groupeId}_${pwId}`;
+    if (snap.groupPws.some((gp) => gp.key === key)) {
+      return {
+        status: 409,
+        data: { message: "This practical work is already assigned to this group." },
+      };
+    }
+    await putRecord("groupPws", { key, groupeId, pwId });
+    const nextSnap = await loadSnapshot();
+    return { status: 200, data: hydrateGroup(nextSnap.groupsMap.get(groupeId), nextSnap, true) };
   }
 
   if (m === "DELETE" && path.startsWith("/api/groups/pw/")) {
     const parts = path.split("/");
     const pwId = Number(parts.pop());
     const groupeId = Number(parts.pop());
+    const group = snap.groupsMap.get(groupeId);
+    if (!group) {
+      return { status: 404, data: { message: "Group not found." } };
+    }
     await deleteRecord("groupPws", `${groupeId}_${pwId}`);
-    return { status: 200, data: { message: "PW removed from group successfully" } };
+    const nextSnap = await loadSnapshot();
+    return { status: 200, data: hydrateGroup(nextSnap.groupsMap.get(groupeId), nextSnap, true) };
   }
 
   // PWS
@@ -464,15 +482,26 @@ export async function handleDemoRequest(method, url, rawBody) {
 
   if (m === "DELETE" && path.startsWith("/api/teeth/delete/")) {
     const id = Number(path.split("/").pop());
-    const usedByPw = snap.pws.some((pw) => Number(pw.toothId) === id);
-    if (usedByPw) {
+    const tooth = snap.teethMap.get(id);
+    if (!tooth) {
+      return { status: 404, data: { message: "Tooth does not exist." } };
+    }
+    const referencing = snap.pws.filter((pw) => Number(pw.toothId) === id);
+    if (referencing.length > 0) {
+      const titles = referencing.map((p) => p.title).join(", ");
       return {
         status: 409,
-        data: { message: "Reassign or delete practical works referencing this tooth first." },
+        data: {
+          message: `Cannot delete "${tooth.name}" because it is referenced by practical work: ${titles}.`,
+        },
       };
     }
     await deleteRecord("teeth", id);
     return { status: 200, data: { message: "tooth deleted successfully" } };
+  }
+
+  if (m === "GET" && path === "/api/studentpws/all") {
+    return { status: 200, data: snap.studentpws.map((spw) => hydrateStudentPW(spw, snap)) };
   }
 
   // STUDENT PWS
