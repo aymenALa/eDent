@@ -13,7 +13,7 @@ services:
 
   backend:
     build:
-      context: ./dents-back-end
+      context: ./edent-backend
     ports:
       - "5050:5050"
     depends_on:
@@ -31,7 +31,7 @@ services:
 
   frontend:
     build:
-      context: ./dents-front-end
+      context: ./edent-frontend
     ports:
       - "5173:5173"
     depends_on:

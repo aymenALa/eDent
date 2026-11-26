@@ -4,31 +4,32 @@ This guide covers deploying **eDent** publicly at **$0.00/month** using free-tie
 
 | Layer | Provider & Tier | Key Limits & Notes |
 |---|---|---|
-| **Frontend** | **Vercel Hobby** | Root `dents-front-end/`, Vite (`dist/`), SPA rewrites via `vercel.json` |
-| **Backend** | **Render Free (Docker)** | Root `dents-back-end/`, 512 MB RAM (`-Xms128m -Xmx320m -XX:+UseSerialGC`), binds `${PORT:-5050}`, spins down after 15 min inactivity (~1 min cold start) |
-| **Database** | **TiDB Cloud Starter** | MySQL-compatible, 5 GiB row storage, mandatory TLS, 6 MiB max single-row limit (`dents.sql` largest row is ~2.06 MB) |
+| **Frontend** | **Vercel Hobby** (`edent`) | Root `edent-frontend/`, Vite (`dist/`), SPA rewrites via `vercel.json` |
+| **Backend** | **Render Free (Docker)** (`edent-backend`) | Root `edent-backend/`, 512 MB RAM (`-Xms128m -Xmx320m -XX:+UseSerialGC`), binds `${PORT:-5050}`, spins down after 15 min inactivity (~1 min cold start) |
+| **Database** | **TiDB Cloud Starter** (`edent-demo`) | MySQL-compatible, 5 GiB row storage, mandatory TLS, 6 MiB max single-row limit |
 
 ---
 
 ## 1. Database Setup — TiDB Cloud Starter ($0)
 
-1. Sign in to **TiDB Cloud** and create a **Starter** cluster (no credit card required).
-2. Confirm the cluster spending limit is set to **$0** (free tier).
-3. Create a database (e.g. `edent`) and note your **Host**, **Port (`4000`)**, **Username**, and **Password**.
-4. Import the sanitized demonstration dataset [`dents.sql`](dents.sql) with TLS enabled:
+1. Sign in to **TiDB Cloud** and create a **Starter** cluster (`edent-demo`, AWS Frankfurt, $0 monthly spending limit).
+2. Create the database `edent_demo` and a least-privilege application user (`SELECT` only for read-only demo, or `SELECT, INSERT, UPDATE, DELETE` on `edent_demo.*`).
+3. Import the sanitized demonstration dataset [`edent.sql`](edent.sql) with TLS enabled:
    ```bash
-   mysql --ssl-mode=VERIFY_IDENTITY -h <TIDB_HOST> -P 4000 -u <TIDB_USER> -p edent < dents.sql
+   mysql --ssl-mode=VERIFY_IDENTITY -h <TIDB_HOST> -P 4000 -u <TIDB_USER> -p edent_demo < edent.sql
    ```
-   > **Verified**: `dents.sql` (`18.4 MB` total; `55` users, `48` students, `54` submissions; largest single row ~`2.06 MB`) contains no `DEFINER`, `USE`, or `CREATE DATABASE` statements and fits well within TiDB Cloud Starter's 5 GiB storage and 6 MiB single-row limits.
 
 ---
 
 ## 2. Backend Setup — Render Free Docker Web Service ($0)
 
-1. In **Render**, create a **New Web Service** connected to your GitHub repository.
+1. In **Render**, create a **New Web Service** connected to `https://github.com/aymenALa/eDent`.
 2. Configure the service:
-   - **Root Directory**: `dents-back-end`
-   - **Runtime**: `Docker` (uses [`dents-back-end/Dockerfile`](dents-back-end/Dockerfile))
+   - **Service Name**: `edent-backend`
+   - **Branch**: `ui-enhancement`
+   - **Root Directory**: `edent-backend`
+   - **Runtime**: `Docker`
+   - **Dockerfile Path**: `./Dockerfile` (uses [`edent-backend/Dockerfile`](edent-backend/Dockerfile))
    - **Instance Type**: `Free`
    - **Health Check Path**: `/api/health`
 3. Add the following **Environment Variables** in Render:
@@ -40,12 +41,12 @@ This guide covers deploying **eDent** publicly at **$0.00/month** using free-tie
 | `APP_DEMO_READONLY` | `true` | Blocks `POST`/`PUT`/`PATCH`/`DELETE` (except `/api/users/login`) with HTTP `403` |
 | `APP_MAIL_ENABLED` | `false` | Disables outbound SMTP in public demo |
 | `CORS_ALLOWED_ORIGINS` | `https://<your-app>.vercel.app` | Comma-separated explicit origins (no `*`) |
-| `SPRING_DATASOURCE_URL` | `jdbc:mysql://<TIDB_HOST>:4000/edent?serverTimezone=UTC&sslMode=VERIFY_IDENTITY` | Mandatory TLS for TiDB Cloud |
-| `SPRING_DATASOURCE_USERNAME` | `<TIDB_USER>` | From TiDB Cloud |
-| `SPRING_DATASOURCE_PASSWORD` | `<TIDB_PASSWORD>` | From TiDB Cloud |
-| `SPRING_JPA_DDL_AUTO` | `none` | Recommended after importing `dents.sql` (`update` also supported) |
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://<TIDB_HOST>:4000/edent_demo?serverTimezone=UTC&sslMode=VERIFY_IDENTITY` | Mandatory TLS for TiDB Cloud |
+| `SPRING_DATASOURCE_USERNAME` | `<restricted-db-user>` | Least-privilege TiDB Cloud user |
+| `SPRING_DATASOURCE_PASSWORD` | `<restricted-db-password>` | From TiDB Cloud |
+| `SPRING_JPA_DDL_AUTO` | `none` | Recommended after importing `edent.sql` |
 
-4. Deploy and verify `GET https://<your-backend>.onrender.com/api/health` returns:
+4. Deploy and verify `GET https://edent-backend.onrender.com/api/health` returns:
    ```json
    { "status": "UP", "demoReadOnly": true }
    ```
@@ -55,15 +56,16 @@ This guide covers deploying **eDent** publicly at **$0.00/month** using free-tie
 
 ## 3. Frontend Setup — Vercel Hobby ($0)
 
-1. In **Vercel**, import the GitHub repository as a new project.
-2. Configure project settings:
-   - **Root Directory**: `dents-front-end`
+1. In **Vercel**, import `https://github.com/aymenALa/eDent` as a new project:
+   - **Project Name**: `edent`
+   - **Branch**: `ui-enhancement`
+   - **Root Directory**: `edent-frontend`
    - **Framework Preset**: `Vite`
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
-3. Add **Environment Variable**:
-   - `VITE_API_BASE_URL` = `https://<your-backend>.onrender.com/api`
-4. Deploy. [`dents-front-end/vercel.json`](dents-front-end/vercel.json) rewrites all routes to `/index.html` so direct links and browser refreshes work cleanly.
+2. Add **Environment Variable**:
+   - `VITE_API_BASE_URL` = `https://<your-render-service>.onrender.com/api`
+3. Deploy. [`edent-frontend/vercel.json`](edent-frontend/vercel.json) rewrites all routes to `/index.html` so direct links and browser refreshes work cleanly.
 
 ---
 
@@ -73,16 +75,10 @@ This guide covers deploying **eDent** publicly at **$0.00/month** using free-tie
   - Visitors can log in across all 3 roles, browse dashboards, inspect student submissions, test the **Tooth Analysis Studio** landmark/angle preview locally in the browser, and export **PDF reports**.
   - Any mutating request (`POST`, `PUT`, `PATCH`, `DELETE`) other than `POST /api/users/login` is rejected server-side with `403 Forbidden` (`"Public demo mode is read-only. Changes cannot be saved."`).
 - Password hashes (`User.password`) and activation codes (`User.codeActivation`) are marked `WRITE_ONLY` and never serialized in API responses.
-- Demo accounts seeded in `dents.sql`:
+- Demo accounts seeded in `edent.sql`:
   - **Administrator**: `admin.synth@test.local` / `SynthAdmin!23`
   - **Professor**: `prof.synth@test.local` / `SynthProf!23`
   - **Student**: `student.synth@test.local` / `SynthStud!23`
-
-### Historical GitHub Exposure Checklist
-
-Before making the repository or deployment public:
-1. Rotate any Gmail App Password or database credentials that may have existed in earlier Git commits on `main`.
-2. Ensure no `.env` files with real secrets are committed (`.env.example` contains placeholders only).
 
 ---
 

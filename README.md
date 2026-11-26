@@ -20,17 +20,17 @@ Originally created by **Yahya Mourid**, enhanced and modernized by **Aymen Aliou
 
 ## Local Database Setup & Import
 
-The repository includes a sanitized, synthetic demonstration dataset in [`dents.sql`](dents.sql) (1 administrator, 6 professors, 48 students, 6 groups, 12 teeth, 10 practical works, and 51 completed submissions with procedurally generated tooth illustrations).
+The repository includes a sanitized, synthetic demonstration dataset in [`edent.sql`](edent.sql) (1 administrator, 6 professors, 48 students, 6 groups, 12 teeth, 10 practical works, and 54 completed submissions with procedurally generated tooth illustrations).
 
 ```sql
 CREATE DATABASE IF NOT EXISTS dents;
 ```
 
 ```powershell
-mysql -h 127.0.0.1 -P 3307 -u root dents < dents.sql
+mysql -h 127.0.0.1 -P 3307 -u root dents < edent.sql
 ```
 
-> Default Spring Boot configuration in `dents-back-end/src/main/resources/application.properties` targets `jdbc:mysql://localhost:3307/dents?serverTimezone=UTC` (override via `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` as needed).
+> Default Spring Boot configuration in `edent-backend/src/main/resources/application.properties` targets `jdbc:mysql://localhost:3307/dents?serverTimezone=UTC` (override via `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` as needed).
 
 ## Environment Variables
 
@@ -40,7 +40,7 @@ mysql -h 127.0.0.1 -P 3307 -u root dents < dents.sql
   - `SPRING_DATASOURCE_PASSWORD`
   - `MAIL_USERNAME` (Gmail SMTP username for account/password-recovery emails)
   - `MAIL_PASSWORD` (Google App Password; never commit real credentials)
-- **Frontend** (`dents-front-end/.env` or process environment):
+- **Frontend** (`edent-frontend/.env` or process environment):
   - `VITE_PORT_SPRING=5050`
 
 ## Running Locally
@@ -48,7 +48,7 @@ mysql -h 127.0.0.1 -P 3307 -u root dents < dents.sql
 ### Backend (Maven Wrapper)
 
 ```powershell
-cd dents-back-end
+cd edent-backend
 .\mvnw.cmd test
 .\mvnw.cmd spring-boot:run
 ```
@@ -56,7 +56,7 @@ cd dents-back-end
 ### Frontend (Vite)
 
 ```powershell
-cd dents-front-end
+cd edent-frontend
 npm install
 npm run dev
 ```

@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com</groupId>
-	<artifactId>dents-back-end</artifactId>
+	<artifactId>edent-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>dents-back-end</name>
-	<description>dents-back-end</description>
+	<name>edent-backend</name>
+	<description>eDent Backend Service</description>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
