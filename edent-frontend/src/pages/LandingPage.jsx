@@ -517,7 +517,7 @@ const LandingPage = () => {
                 {IS_DEMO_MODE ? "Try live demo" : "Sign in"}
               </Link>
             </div>
-            <p>Originally created by Yahya Mourid • Modernized by Aymen Alioua</p>
+            <p>Developed and maintained by Aymen Alioua.</p>
           </div>
         </div>
       </footer>
