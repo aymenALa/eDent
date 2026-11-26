@@ -24,7 +24,7 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import { EmptyState, ErrorState, LoadingState } from "../ui/States";
 import SubmissionReview from "../SubmissionReview";
 import AngleImageAnnotator from "./AngleImageAnnotator";
-import { API_BASE, authHeaders, getAuthUser, setAuthUser, useDemoMode } from "../../utils/api";
+import { API_BASE, apiFetch, authHeaders, getAuthUser, setAuthUser, useDemoMode } from "../../utils/api";
 import { compositeAnnotatedImage } from "../../utils/annotationCanvas";
 
 const emptyAnalysis = () => ({ image: "", angles: [], points: [] });
@@ -72,8 +72,8 @@ const StudentHome = () => {
     setLoadError("");
     try {
       const [studentResponse, completedResponse] = await Promise.all([
-        fetch(`${API_BASE}/users/${studentId}`, { headers: authHeaders() }),
-        fetch(`${API_BASE}/users/testpw/${studentId}`, { headers: authHeaders() }),
+        apiFetch(`${API_BASE}/users/${studentId}`, { headers: authHeaders() }),
+        apiFetch(`${API_BASE}/users/testpw/${studentId}`, { headers: authHeaders() }),
       ]);
       if (!studentResponse.ok || !completedResponse.ok) {
         throw new Error("Could not load the student dashboard.");
@@ -162,7 +162,7 @@ const StudentHome = () => {
     setMessage("");
     setIsErrorMsg(false);
     try {
-      const response = await fetch(`${API_BASE}/users/update/student/${studentId}`, {
+      const response = await apiFetch(`${API_BASE}/users/update/student/${studentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(profile),
@@ -220,7 +220,7 @@ const StudentHome = () => {
         noteSide: scoreAngles(side.angles),
       };
 
-      const response = await fetch(`${API_BASE}/studentpws/add/${studentId}/${selectedPw.id}`, {
+      const response = await apiFetch(`${API_BASE}/studentpws/add/${studentId}/${selectedPw.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),

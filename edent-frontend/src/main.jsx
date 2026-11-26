@@ -2,9 +2,10 @@ import "./index.css";
 import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { getAuthUser } from "./utils/api";
+import { IS_DEMO_MODE, getAuthUser } from "./utils/api";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const DemoAccess = lazy(() => import("./pages/DemoAccess"));
 const AdminHome = lazy(() => import("./components/admin/AdminHome"));
 const ProfHome = lazy(() => import("./components/prof/ProfHome"));
 const StudentHome = lazy(() => import("./components/student/StudentHome"));
@@ -71,7 +72,11 @@ export const AppRoutes = () => {
           </>
         )}
 
-        {!userlogin && <Route path="/login" element={<Login />} />}
+        {!userlogin && IS_DEMO_MODE && <Route path="/demo" element={<DemoAccess />} />}
+        {!userlogin && <Route path="/login" element={IS_DEMO_MODE ? <DemoAccess /> : <Login />} />}
+        {userlogin && IS_DEMO_MODE && (
+          <Route path="/demo" element={<Navigate replace to={role === "professor" ? "/professor/dashboard" : `/${role}`} />} />
+        )}
         {!userlogin && <Route path="/login/activationcode" element={<CodeActivation />} />}
         {!userlogin && email && <Route path="/login/verifycode" element={<VerifyCode />} />}
         {!userlogin && code && <Route path="/login/resetpwd" element={<ResetPwd />} />}

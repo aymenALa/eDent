@@ -1,12 +1,32 @@
 # eDent — Zero-Cost Cloud Deployment Guide ($0.00)
 
-This guide covers deploying **eDent** publicly at **$0.00/month** using free-tier managed services:
+eDent supports two zero-cost deployment options:
+
+1. **Interactive Portfolio Demo (`portfolio-demo` branch, Vercel Hobby only — $0.00, no credit card)**:
+   - Runs **100% in the browser** (`VITE_DEMO_MODE=true`) using a centralized demo adapter + **IndexedDB** (`edent_portfolio_demo`), seeded from `edent-frontend/public/demo-seed.json`.
+   - Includes passwordless role selection (`/demo`), in-workspace role switching, **Reset demo data**, sample tooth images, floating welcome announcement, and PDF exports — with **zero** backend or cloud database dependency.
+2. **Full-Stack Deployment (`ui-enhancement` branch)**:
 
 | Layer | Provider & Tier | Key Limits & Notes |
 |---|---|---|
 | **Frontend** | **Vercel Hobby** (`edent`) | Root `edent-frontend/`, Vite (`dist/`), SPA rewrites via `vercel.json` |
 | **Backend** | **Render Free (Docker)** (`edent-backend`) | Root `edent-backend/`, 512 MB RAM (`-Xms128m -Xmx320m -XX:+UseSerialGC`), binds `${PORT:-5050}`, spins down after 15 min inactivity (~1 min cold start) |
 | **Database** | **TiDB Cloud Starter** (`edent-demo`) | MySQL-compatible, 5 GiB row storage, mandatory TLS, 6 MiB max single-row limit |
+
+---
+
+## 0. Portfolio Demo Deployment — Vercel Hobby ($0, No Backend Required)
+
+1. In **Vercel**, import `https://github.com/aymenALa/eDent`:
+   - **Project Name**: `edent`
+   - **Branch**: `portfolio-demo`
+   - **Root Directory**: `edent-frontend`
+   - **Framework Preset**: `Vite`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+2. Add **Environment Variable**:
+   - `VITE_DEMO_MODE` = `true`
+3. Deploy. [`edent-frontend/vercel.json`](edent-frontend/vercel.json) handles React Router SPA rewrites (`/demo`, `/professor/dashboard`, `/student`, `/admin`, etc.). No `VITE_API_BASE_URL`, backend, or database credentials are needed.
 
 ---
 
