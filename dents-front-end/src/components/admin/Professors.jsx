@@ -1,138 +1,263 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { faCheckCircle, faClock, faTrash, faUserTie } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import PageHeader from "../ui/PageHeader";
+import StatCard from "../ui/StatCard";
+import SearchInput from "../ui/SearchInput";
+import FilterSelect from "../ui/FilterSelect";
+import DataTable from "../ui/DataTable";
+import StatusBadge from "../ui/StatusBadge";
+import Avatar from "../ui/Avatar";
+import Button from "../ui/Button";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
+import { API_BASE, authHeaders, getAuthUser, useDemoMode } from "../../utils/api";
 
-import Sidebar from './../Sidebar'
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Logout from '../auth/Logout';
 const Professors = () => {
-  const [user, setuser] = useState([]);
-  const [deletingId, setDeletingId] = useState(null);
-  const [message, setMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const port = import.meta.env.VITE_PORT_SPRING;
-  const userlogin = JSON.parse(localStorage.getItem('userlogin')) || {};
+  const userlogin = getAuthUser() || {};
+  const demoReadOnly = useDemoMode();
+  const [professors, setProfessors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [togglingId, setTogglingId] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const fetchapi = () => {
-    axios.get(`http://localhost:${port}/api/users/allProfessor`)
-    .then(response => {
-      setuser(response.data); 
-    })
-    .catch(error => {
-      console.error('Error fetching data:', error);
-    });
-  };
-
-  const deleteProfessor = async (professor) => {
-    if (!window.confirm(`Delete professor ${professor.firstName || ''} ${professor.lastName || ''}?`)) return;
-
-    setDeletingId(professor.id);
-    setMessage('');
-    setErrorMessage('');
+  const fetchProfessors = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      const response = await axios.delete(
-        `http://localhost:${port}/api/users/delete/professor/${userlogin.id}/${professor.id}`,
-        { headers: { Authorization: `Bearer ${userlogin.token}` } }
-      );
-      setuser((current) => current.filter((item) => item.id !== professor.id));
-      setMessage(response.data.message);
-    } catch (error) {
-      setErrorMessage(error.response?.data?.message || 'Could not delete this professor.');
+      const response = await axios.get(`${API_BASE}/users/allProfessor`);
+      setProfessors(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load professor accounts.");
     } finally {
-      setDeletingId(null);
+      setLoading(false);
     }
-  };
-  
+  }, []);
 
   useEffect(() => {
-    fetchapi();
-  }, []); 
-  const handleActivateToggle = (userId) => {
-    // Mettez à jour l'état localement
-    setuser((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === userId ? { ...user, activate: !user.activate } : user
-      )
-    );
+    fetchProfessors();
+  }, [fetchProfessors]);
 
-    axios
-      .post(`http://localhost:${port}/api/users/activate/${userId}`)
-      .then((response) => {
-        // Mise à jour réussie
-      })
-      .catch((error) => {
-        console.error('Error updating activate status:', error);
-      
-        setuser((prevUsers) =>
-          prevUsers.map((user) =>
-            user.id === userId ? { ...user, activate: !user.activate } : user
-          )
-        );
-      });
+  const handleActivateToggle = async (prof) => {
+    const nextState = !prof.activate;
+    setTogglingId(prof.id);
+    setProfessors((prev) =>
+      prev.map((item) => (item.id === prof.id ? { ...item, activate: nextState } : item))
+    );
+    try {
+      const response = await axios.post(`${API_BASE}/users/activate/${prof.id}`);
+      toast.success(
+        response.data?.message ||
+          `Professor account ${nextState ? "activated" : "deactivated"}.`
+      );
+    } catch (err) {
+      setProfessors((prev) =>
+        prev.map((item) => (item.id === prof.id ? { ...item, activate: prof.activate } : item))
+      );
+      toast.error(err.response?.data?.message || "Could not update activation status.");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
+  const confirmDelete = async () => {
+    if (!confirmTarget) return;
+    setDeleting(true);
+    try {
+      const response = await axios.delete(
+        `${API_BASE}/users/delete/professor/${userlogin.id}/${confirmTarget.id}`,
+        { headers: authHeaders() }
+      );
+      setProfessors((prev) => prev.filter((item) => item.id !== confirmTarget.id));
+      toast.success(response.data?.message || "Professor deleted successfully.");
+      setConfirmTarget(null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not delete this professor.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
+  const stats = useMemo(() => {
+    const total = professors.length;
+    const active = professors.filter((p) => p.activate).length;
+    return { total, active, inactive: total - active };
+  }, [professors]);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return professors.filter((p) => {
+      if (statusFilter === "active" && !p.activate) return false;
+      if (statusFilter === "inactive" && p.activate) return false;
+      if (!q) return true;
+      return [p.firstName, p.lastName, p.userName, p.email, p.grade]
+        .filter(Boolean)
+        .some((val) => String(val).toLowerCase().includes(q));
+    });
+  }, [professors, search, statusFilter]);
 
-
-
+  const columns = [
+    {
+      key: "name",
+      label: "Professor",
+      render: (item) => (
+        <div className="flex items-center gap-3">
+          <Avatar photo={item.photo} firstName={item.firstName} lastName={item.lastName} size="sm" />
+          <div>
+            <p className="font-medium text-[#0F172A]">
+              {item.firstName} {item.lastName}
+            </p>
+            <p className="text-xs text-slate-500">@{item.userName}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "email",
+      label: "Email",
+      render: (item) => <span className="text-slate-600">{item.email}</span>,
+    },
+    {
+      key: "grade",
+      label: "Grade",
+      render: (item) => <span className="text-slate-600">{item.grade || "—"}</span>,
+    },
+    {
+      key: "status",
+      label: "Account status",
+      render: (item) => (
+        <StatusBadge tone={item.activate ? "success" : "neutral"}>
+          {item.activate ? "Active" : "Inactive"}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "activation",
+      label: "Access",
+      render: (item) => (
+        <label className="inline-flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            id={`activate-checkbox-${item.id}`}
+            checked={Boolean(item.activate)}
+            disabled={togglingId === item.id || demoReadOnly}
+            onChange={() => handleActivateToggle(item)}
+            title={demoReadOnly ? "Disabled in public demo mode" : undefined}
+            aria-label={`Toggle activation for ${item.firstName} ${item.lastName}`}
+            className="h-4 w-4 rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
+          />
+          <span className="text-xs font-medium text-slate-600">
+            {item.activate ? "Enabled" : "Disabled"}
+          </span>
+        </label>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (item) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={demoReadOnly}
+          title={demoReadOnly ? "Disabled in public demo mode" : undefined}
+          onClick={() => setConfirmTarget(item)}
+          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+        >
+          <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" aria-hidden="true" />
+          Delete
+        </Button>
+      ),
+    },
+  ];
 
   return (
-   
-   <>
-   
-   <div class="mx-20 py-20">
-  {message && <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{message}</p>}
-  {errorMessage && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</p>}
-  <div class="-m-1.5 overflow-x-auto">
-    <div class="p-1.5 min-w-full inline-block align-middle">
-      <div class="border rounded-lg overflow-hidden dark:border-gray-700">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-gray-400">FirstName </th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-gray-400">LastaName</th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-gray-400">@userName </th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Email </th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-gray-400">IsActivate </th>
-              <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            {user.map((item)=>(
-               <tr key={item.id}>
-               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">{item.firstName}</td>
-               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{item.lastName}</td>
-               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{item.userName}</td>
-               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{item.email}</td>
-               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-  <input
-    type="checkbox"
-    id={`activate-checkbox-${item.id}`}
-    className="relative w-[3.25rem] h-7 p-px bg-gray-100 border-transparent text-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none checked:bg-none checked:text-blue-600 checked:border-blue-600 focus:checked:border-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-600 before:inline-block before:w-6 before:h-6 before:bg-white checked:before:bg-blue-200 before:translate-x-0 checked:before:translate-x-full before:rounded-full before:shadow before:transform before:ring-0 before:transition before:ease-in-out before:duration-200 dark:before:bg-gray-400 dark:checked:before:bg-blue-200"
-    checked={item.activate}
-    onChange={() => handleActivateToggle(item.id)} 
-  />
-</td>
-               <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                 <button type="button"
-                   onClick={() => deleteProfessor(item)}
-                   disabled={deletingId === item.id}
-                   class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none dark:text-red-500 dark:hover:text-red-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-                   {deletingId === item.id ? 'Deleting...' : 'Delete'}
-                 </button>
-               </td>
-             </tr>
+    <div>
+      <PageHeader
+        title="Professor management"
+        description="Activate, review, and manage faculty accounts across the eDent platform."
+      />
 
-            ))}
-           
-
-          </tbody>
-        </table>
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        <StatCard label="Total professors" value={stats.total} icon={faUserTie} />
+        <StatCard label="Active accounts" value={stats.active} icon={faCheckCircle} />
+        <StatCard label="Inactive accounts" value={stats.inactive} icon={faClock} />
       </div>
-    </div>
-  </div>
-</div>
-   </>
-  )
-}
 
-export default Professors
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <SearchInput
+            id="admin-prof-search"
+            label="Search professors"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by name, username, or email..."
+            className="sm:w-80"
+          />
+          <FilterSelect
+            id="admin-prof-status"
+            label="Filter by account status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="sm:w-48"
+            options={[
+              { value: "all", label: "All statuses" },
+              { value: "active", label: "Active only" },
+              { value: "inactive", label: "Inactive only" },
+            ]}
+          />
+        </div>
+        {!loading && !error && (
+          <p className="text-xs font-medium text-slate-500">
+            Showing {filtered.length} of {professors.length} professors
+          </p>
+        )}
+      </div>
+
+      {loading ? (
+        <LoadingState label="Loading professor accounts..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchProfessors} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(item) => item.id}
+          emptyState={
+            <EmptyState
+              title="No matching professors"
+              description={
+                search || statusFilter !== "all"
+                  ? "Try clearing your search or status filter."
+                  : "No professor accounts are currently registered."
+              }
+            />
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title="Delete professor account"
+        message={
+          confirmTarget
+            ? `Are you sure you want to delete ${confirmTarget.firstName || ""} ${confirmTarget.lastName || ""} (${confirmTarget.email})? Professors linked to existing groups cannot be deleted.`
+            : ""
+        }
+        confirmLabel="Delete professor"
+      />
+    </div>
+  );
+};
+
+export default Professors;

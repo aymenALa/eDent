@@ -1,3 +1,5 @@
 .vscode/
 .env
 **/.env
+*.log
+tidb-ca.pem

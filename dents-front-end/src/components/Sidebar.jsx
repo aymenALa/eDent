@@ -6,12 +6,13 @@ import Logout from './auth/Logout'
 import Prof from '../assets/prof.png'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHouse, faUser,faChartBar, faPeopleGroup, faTooth, faGear, faPaperclip } from '@fortawesome/free-solid-svg-icons';
+import { API_BASE } from "../utils/api";
 
 const Sidebar = () => {
   const [prof, setProf] = useState({})
   const [loading, setLoading] = useState(false)
   const userlogin = JSON.parse(localStorage.getItem("userlogin"))
-  const url = `http://localhost:5050/api/users/${userlogin.id}`;
+  const url = `${API_BASE}/users/${userlogin.id}`;
 
   const getProfessor = async () => {
     const res = await axios.get(`${url}`);

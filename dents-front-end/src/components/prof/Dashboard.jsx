@@ -1,163 +1,359 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Prof from '../../assets/b.png'
-import StudentDetails from './StudentDetails';
-import { DotLoader } from 'react-spinners';
-import {faDownload, faPlus, faTrash, faNoteSticky, faEnvelope, faRefresh, faPhone, faPen, faClose, faAdd, faHouse, faUser, faPeopleGroup, faTooth, faGear, faPaperclip, faArrowCircleLeft } from '@fortawesome/free-solid-svg-icons';
-import jsPDF from 'jspdf';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faArrowLeft,
+  faDownload,
+  faNoteSticky,
+  faPaperclip,
+  faPeopleGroup,
+  faPlus,
+  faRefresh,
+  faUser,
+} from "@fortawesome/free-solid-svg-icons";
+import "chart.js/auto";
+import { Bar } from "react-chartjs-2";
+import PageHeader from "../ui/PageHeader";
+import StatCard from "../ui/StatCard";
+import SearchInput from "../ui/SearchInput";
+import FilterSelect from "../ui/FilterSelect";
+import DataTable from "../ui/DataTable";
+import Avatar from "../ui/Avatar";
+import Button from "../ui/Button";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
+import StudentDetails from "./StudentDetails";
+import { API_BASE, getAuthUser } from "../../utils/api";
+import { exportStudentDirectoryPdf } from "../../utils/pdfExport";
+
 const Dashboard = () => {
-    const port = import.meta.env.VITE_PORT_SPRING;
-    const [groups, setGroups] = useState([]);
-    const [pws, setPws] = useState([])
-    const [students, setStudents] = useState([]);
-    const [nbrStudent, setNbrStudent] = useState(0)
-    const [loading, setLoading] = useState(false);
-    const [loadings, setLoadings] = useState(false);
-    const [groupId, setGroupId] = useState("")
-    const [studentId, setStudentId] = useState("")
-    const [studentMode, setStudentMode] = useState(false)
-    const url = `http://localhost:${port}/api`;
-    const userlogin = JSON.parse(localStorage.getItem("userlogin"))
+  const userlogin = getAuthUser() || {};
+  const [groups, setGroups] = useState([]);
+  const [pws, setPws] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [filtering, setFiltering] = useState(false);
+  const [error, setError] = useState("");
+  const [groupId, setGroupId] = useState("-1");
+  const [search, setSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
 
-    const fetchGroups = async () => {
-        setLoading(true);
-        const rep = await axios.get(`${url}/groups/professor/${userlogin.id}`);
-        setGroups(rep.data);
-        setLoading(false);
-    };
-    const fetshPws = async () => {
-        setLoading(true)
-        const rep = await axios.get(`${url}/pws/all`)
-        setPws(rep.data)
-        setLoading(false)
-    }
-    const fetchStudents = async () => {
-        setLoadings(true);
-        const rep = await axios.get(`${url}/users/students/${userlogin.id}`);
-        setStudents(rep.data);
-        setNbrStudent(rep.data.length)
-        setLoadings(false);
-    };
-    useEffect(() => {
-        fetchStudents()
-        fetchGroups()
-        fetshPws()
-    }, []);
-    const reset = () => {
-        fetchStudents()
-        setGroupId("")
-    }
-    const handleGroup = (e) => {
-        if (e.target.value === -1) {
-            fetchStudents()
-            return
-        }
-        setGroupId(e.target.value)
-        getStudentsByGroup(groupId)
-    }
-    const getStudentsByGroup = async (e) => {
-        const selectedGroupId = e.target.value;
+  const [profInfo, setProfInfo] = useState(userlogin);
 
-        try {
-            if (selectedGroupId !== '-1') {
-                setGroupId(selectedGroupId)
-                const rep = await axios.get(`${url}/users/students/group/${selectedGroupId}`)
-                setStudents(rep.data)
-            }
-
-        } catch (error) {
-            console.log(error)
-        }
+  const loadOverview = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [studentsRes, groupsRes, pwsRes, profRes] = await Promise.all([
+        axios.get(`${API_BASE}/users/students/${userlogin.id}`),
+        axios.get(`${API_BASE}/groups/professor/${userlogin.id}`),
+        axios.get(`${API_BASE}/pws/all`),
+        axios.get(`${API_BASE}/users/${userlogin.id}`),
+      ]);
+      const studentList = Array.isArray(studentsRes.data) ? studentsRes.data : [];
+      setStudents(studentList);
+      setTotalStudents(studentList.length);
+      setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+      setPws(Array.isArray(pwsRes.data) ? pwsRes.data : []);
+      if (profRes.data) setProfInfo(profRes.data);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load professor dashboard.");
+    } finally {
+      setLoading(false);
     }
+  }, [userlogin.id]);
 
-    const handleStudentClick = (id) => {
-        setStudentId(id)
-        setStudentMode(true)
+  useEffect(() => {
+    if (userlogin.id) loadOverview();
+  }, [loadOverview, userlogin.id]);
+
+  const handleGroupChange = async (e) => {
+    const selectedGroupId = e.target.value;
+    setGroupId(selectedGroupId);
+    setFiltering(true);
+    setError("");
+    try {
+      if (selectedGroupId === "-1") {
+        const rep = await axios.get(`${API_BASE}/users/students/${userlogin.id}`);
+        const list = Array.isArray(rep.data) ? rep.data : [];
+        setStudents(list);
+        setTotalStudents(list.length);
+      } else {
+        const rep = await axios.get(`${API_BASE}/users/students/group/${selectedGroupId}`);
+        setStudents(Array.isArray(rep.data) ? rep.data : []);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not filter students by group.");
+    } finally {
+      setFiltering(false);
     }
-    const downloadPdf = () => {
-        const doc = new jsPDF();
-    
-        doc.text('Liste des étudiants', 20, 10);
-    
-        students.forEach((student, index) => {
-          const yOffset = 20 + index * 30;
-          doc.text(`Nom: ${student.firstName} ${student.lastName}`, 20, yOffset);
-          doc.text(`Email: ${student.email}`, 20, yOffset + 10);
-          doc.text(`Numéro de téléphone: ${student.number}`, 20, yOffset + 20);
-          // Add other information you want to include in the PDF
-        });
-    
-        doc.save('liste_etudiants.pdf');
-      };
+  };
+
+  const resetFilter = () => {
+    setGroupId("-1");
+    setSearch("");
+    loadOverview();
+  };
+
+  const filteredStudents = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) =>
+      [s.firstName, s.lastName, s.email, s.number, s.group?.code]
+        .filter(Boolean)
+        .some((val) => String(val).toLowerCase().includes(q))
+    );
+  }, [students, search]);
+
+  const downloadPdf = async () => {
+    const selectedGroup =
+      groupId === "-1"
+        ? "All groups"
+        : groups.find((g) => String(g.id) === groupId)?.code || "Selected group";
+    await exportStudentDirectoryPdf({
+      students: filteredStudents,
+      professor: profInfo,
+      groupLabel: selectedGroup,
+    });
+  };
+
+  if (selectedStudentId) {
     return (
-        <div className='flex flex-col justify-center items-center w-full p-5 '>
-            {!studentMode ?
-                <><div className='flex gap-20 justify-center items-center    w-4/5  mt-5'>
-                    <span className='flex flex-col items-center justify-center px-2 py-5 w-1/3 rounded-lg shadow-l bg-white'>
-                        <span className='flex items-center justify-center text-3xl font-bold text-blue-400'>
-                            <FontAwesomeIcon icon={faPeopleGroup} className='w-30 h-30 mx-2 p-4 rounded-tl-xl rounded-br-xl bg-blue-400 text-white' />
-                            <p className=''>Groups</p>
-                        </span>
-                        <p className='font-bold text-3xl text-gray-600'>{groups.length}</p>
-                    </span>
-                    <span className=' flex flex-col items-center justify-center px-2 py-5 w-1/3 rounded-lg shadow-l bg-white'>
-                        <span className='flex items-center justify-center text-3xl font-bold text-blue-400'>
-                            <FontAwesomeIcon icon={faUser} className='w-30 h-30 mx-2 p-4 rounded-tl-xl rounded-br-xl bg-blue-400 text-white' />
-                            <p className=''>Students</p>
-                        </span>
-                        <p className='font-bold text-3xl text-gray-600'>{nbrStudent}</p>
-                    </span>
-                    <span className='flex flex-col items-center justify-center px-2 py-5 w-1/3 rounded-lg shadow-l bg-white'>
-                        <span className='flex items-center justify-center text-3xl font-bold text-blue-400'>
-                            <FontAwesomeIcon icon={faNoteSticky} className='w-30 h-30 mx-2 p-4 rounded-tl-xl rounded-br-xl bg-blue-400 text-white' />
-                            <p className=''>PWS</p>
-                        </span>
-                        <p className='font-bold text-3xl text-gray-600'>{pws.length}</p>
-                    </span>
-                </div>
-                    <div className='flex justify-between items-center my-10 px-20 py-3 w-4/5 bg-white rounded-lg'>
-                        <p className='text-xl font-bold text-gray-700  w-2/3'>Student't List</p>
-                        <div className='flex items-center w-3/5'>
-                            <p className='text-gray-500 font-semibold w-2/6 mr-3'>Filter by : </p>
-                            <select value={groupId} onChange={getStudentsByGroup} class="py-3 w-3/6 px-4 pe-9 text-gray-500 block border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
-                                {!groupId && <option value='-1'  >Select group</option>}
-                                {groups.map((group, index) => (
-                                    <option value={group.id}>{group.code}</option>
-                                ))}
-                            </select>
-                            <FontAwesomeIcon onClick={() => reset()} className='mx-3 w-1/12 text-blue-400 hover:text-blue-500' icon={faRefresh} />
-                            <FontAwesomeIcon onClick={downloadPdf} className='mx-3 w-1/12 text-blue-400 hover:text-blue-500 cursor-pointer' icon={faDownload} />
-                        </div>
-                    </div>
-                    <div className={`grid  grid-cols-${Math.min(students.length, 3)} gap-10`}>
-                        {!loadings ?
-                        students.length !== 0 &&
-                            students.map((student, index) => (
-                                <div onClick={() =>handleStudentClick(student.id)} className='flex flex-col  items-center rounded-t-xl shadow-xl bg-white hover:scale-105'>
-                                    <div className='bg-blue-400 bg-opacity-80  rounded-t-xl w-full flex justify-center '>
-                                        <img src={student.photo ===null ? Prof : `data:image/png;base64, ${student.photo}`} className='w-48 h-48 rounded-full p-3' />
-                                    </div>
-                                    <div className='bg-white flex flex-col items-center py-1 px-1 b'>
-                                        <p className='text-xl font-semibold text-gray-700 my-1'>{student.firstName} {student.lastName}</p>
-                                        <p className='text-gray-500'> <FontAwesomeIcon icon={faEnvelope} className='mr-2' /> {student.email}</p>
-                                        <p className='text-gray-500'> <FontAwesomeIcon icon={faPhone} className='mr-2' />{student.number}</p>
-                                    </div>
-                                </div>
-                            ))
-                            :<DotLoader color='#36d7b7' className='mt-20' />
-                        }
-                    </div>
-                </>
-                :
-                <div className='w-full flex justify-center'>
-                <FontAwesomeIcon onClick={() => setStudentMode(false)} icon={faArrowCircleLeft} className='absolute top-12 left-64 ml-12 text-3xl text-blue-400 hover:text-blue-700'/>
-                <StudentDetails id={studentId}/>
-                </div>
-                
-            }
+      <div>
+        <div className="mb-5">
+          <Button variant="secondary" size="sm" onClick={() => setSelectedStudentId(null)}>
+            <FontAwesomeIcon icon={faArrowLeft} className="h-3.5 w-3.5" aria-hidden="true" />
+            Back to student directory
+          </Button>
         </div>
-    )
-}
+        <StudentDetails id={selectedStudentId} />
+      </div>
+    );
+  }
 
-export default Dashboard
+  const groupChartData = {
+    labels: groups.map((g) => g.code),
+    datasets: [
+      {
+        label: "Students",
+        data: groups.map((g) => g.student?.length || 0),
+        backgroundColor: "#0F766E",
+        borderRadius: 5,
+      },
+      {
+        label: "Assigned PWs",
+        data: groups.map((g) => g.pws?.length || 0),
+        backgroundColor: "#14B8A6",
+        borderRadius: 5,
+      },
+    ],
+  };
+
+  const groupChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "y",
+    scales: {
+      x: { beginAtZero: true, ticks: { precision: 0 } },
+      y: { grid: { display: false } },
+    },
+    plugins: { legend: { position: "top" } },
+  };
+
+  const columns = [
+    {
+      key: "student",
+      label: "Student",
+      render: (s) => (
+        <div className="flex items-center gap-3">
+          <Avatar photo={s.photo} firstName={s.firstName} lastName={s.lastName} size="sm" />
+          <div>
+            <p className="font-medium text-[#0F172A]">
+              {s.firstName} {s.lastName}
+            </p>
+            {s.userName && <p className="text-xs text-slate-500">@{s.userName}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "email",
+      label: "Email",
+      render: (s) => <span className="text-slate-600">{s.email}</span>,
+    },
+    {
+      key: "number",
+      label: "Phone",
+      render: (s) => <span className="text-slate-600">{s.number || "—"}</span>,
+    },
+    {
+      key: "group",
+      label: "Group",
+      render: (s) => <span className="text-slate-600">{s.group?.code || "—"}</span>,
+    },
+    {
+      key: "action",
+      label: "Submission review",
+      align: "right",
+      render: (s) => (
+        <Button variant="secondary" size="sm" onClick={() => setSelectedStudentId(s.id)}>
+          Inspect work
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Professor dashboard"
+        description="Overview of your assigned groups, enrolled students, and practical-work modules."
+        actions={
+          <Button variant="secondary" onClick={downloadPdf} disabled={!filteredStudents.length}>
+            <FontAwesomeIcon icon={faDownload} className="h-3.5 w-3.5" aria-hidden="true" />
+            Export PDF
+          </Button>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="My groups" value={groups.length} icon={faPeopleGroup} />
+        <StatCard label="My students" value={totalStudents} icon={faUser} />
+        <StatCard label="Catalog PWs" value={pws.length} icon={faNoteSticky} />
+      </div>
+
+      {/* Group Distribution + Quick Actions */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[#0F172A]">
+                Cohort &amp; assignment distribution
+              </h2>
+              <p className="text-xs text-slate-500">
+                Students and assigned practical works across your active groups.
+              </p>
+            </div>
+            <Link
+              to="/professor/stats"
+              className="text-xs font-medium text-[#0F766E] hover:underline"
+            >
+              Full analytics
+            </Link>
+          </div>
+          {groups.length ? (
+            <div className="h-56">
+              <Bar data={groupChartData} options={groupChartOptions} />
+            </div>
+          ) : (
+            <p className="py-10 text-center text-sm text-slate-500">
+              No groups created yet.
+            </p>
+          )}
+        </section>
+
+        <section className="flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-[#0F172A]">Quick actions</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Jump directly to your academic management workflows.
+            </p>
+            <div className="mt-4 space-y-2.5">
+              <Link
+                to="/professor/student"
+                className="flex items-center justify-between rounded-lg border border-[#E2E8F0] px-3.5 py-2.5 text-sm font-medium text-[#0F172A] transition-colors hover:border-[#0F766E] hover:bg-teal-50/40"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <FontAwesomeIcon icon={faPlus} className="h-3.5 w-3.5 text-[#0F766E]" aria-hidden="true" />
+                  Manage students
+                </span>
+                <span className="text-xs text-slate-500">{totalStudents}</span>
+              </Link>
+              <Link
+                to="/professor/group"
+                className="flex items-center justify-between rounded-lg border border-[#E2E8F0] px-3.5 py-2.5 text-sm font-medium text-[#0F172A] transition-colors hover:border-[#0F766E] hover:bg-teal-50/40"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <FontAwesomeIcon icon={faPeopleGroup} className="h-3.5 w-3.5 text-[#0F766E]" aria-hidden="true" />
+                  Manage groups &amp; PWs
+                </span>
+                <span className="text-xs text-slate-500">{groups.length}</span>
+              </Link>
+              <Link
+                to="/professor/pw"
+                className="flex items-center justify-between rounded-lg border border-[#E2E8F0] px-3.5 py-2.5 text-sm font-medium text-[#0F172A] transition-colors hover:border-[#0F766E] hover:bg-teal-50/40"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <FontAwesomeIcon icon={faPaperclip} className="h-3.5 w-3.5 text-[#0F766E]" aria-hidden="true" />
+                  Practical-work catalog
+                </span>
+                <span className="text-xs text-slate-500">{pws.length}</span>
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Student Directory Toolbar */}
+      <div className="flex flex-col gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-[#0F172A]">Student list</h2>
+          <p className="text-xs text-slate-500">
+            Showing {filteredStudents.length} of {students.length} students
+            {groupId !== "-1" ? " in selected group" : ""}.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SearchInput
+            id="prof-dash-search"
+            label="Search students"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search students..."
+            className="w-full sm:w-64"
+          />
+          <FilterSelect
+            id="prof-dash-group"
+            label="Filter by group"
+            value={groupId}
+            onChange={handleGroupChange}
+            className="w-full sm:w-44"
+            options={[
+              { value: "-1", label: "All groups" },
+              ...groups.map((g) => ({ value: String(g.id), label: g.code })),
+            ]}
+          />
+          <Button variant="ghost" size="sm" onClick={resetFilter} aria-label="Reset student filter">
+            <FontAwesomeIcon icon={faRefresh} className="h-3.5 w-3.5" aria-hidden="true" />
+            Reset
+          </Button>
+        </div>
+      </div>
+
+      {loading || filtering ? (
+        <LoadingState label="Loading students..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={loadOverview} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filteredStudents}
+          rowKey={(s) => s.id}
+          emptyState={
+            <EmptyState
+              title="No students found"
+              description={
+                search || groupId !== "-1"
+                  ? "No students match the selected group or search term."
+                  : "No students are assigned to your groups yet."
+              }
+            />
+          }
+        />
+      )}
+    </div>
+  );
+};
+
+export default Dashboard;

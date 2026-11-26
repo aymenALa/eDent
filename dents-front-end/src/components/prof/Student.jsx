@@ -1,355 +1,426 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faPen } from '@fortawesome/free-solid-svg-icons';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import Prof from '../../assets/b.png'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import PageHeader from "../ui/PageHeader";
+import SearchInput from "../ui/SearchInput";
+import FilterSelect from "../ui/FilterSelect";
+import DataTable from "../ui/DataTable";
+import Avatar from "../ui/Avatar";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import FormField from "../ui/FormField";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
+import { API_BASE, authHeaders, getAuthUser } from "../../utils/api";
+
+const EMPTY_STUDENT = {
+  id: "",
+  userName: "",
+  firstName: "",
+  lastName: "",
+  password: "",
+  email: "",
+  number: "",
+  group: { id: "" },
+};
+
+const PAGE_SIZE = 10;
 
 const Student = () => {
-    const port = import.meta.env.VITE_PORT_SPRING;
-    const [students, setStudents] = useState([]);
-    const [student, setStudent] = useState({
-        id: '',
-        userName: '',
-        firstName: '',
-        lastName: '',
-        password: '',
-        email: '',
-        number: '',
-        group: {
-            id: ''
-        }
+  const userlogin = getAuthUser() || {};
+  const [students, setStudents] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [student, setStudent] = useState(EMPTY_STUDENT);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [updateMode, setUpdateMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [studRes, grpRes] = await Promise.all([
+        axios.get(`${API_BASE}/users/students/${userlogin.id}`),
+        axios.get(`${API_BASE}/groups/professor/${userlogin.id}`),
+      ]);
+      setStudents(Array.isArray(studRes.data) ? studRes.data : []);
+      setGroups(Array.isArray(grpRes.data) ? grpRes.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load students.");
+    } finally {
+      setLoading(false);
+    }
+  }, [userlogin.id]);
+
+  useEffect(() => {
+    if (userlogin.id) loadData();
+  }, [loadData, userlogin.id]);
+
+  const openCreate = () => {
+    setStudent(EMPTY_STUDENT);
+    setUpdateMode(false);
+    setFormErr("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setStudent({
+      id: item.id,
+      userName: item.userName || "",
+      firstName: item.firstName || "",
+      lastName: item.lastName || "",
+      password: "",
+      email: item.email || "",
+      number: item.number || "",
+      group: { id: item.group?.id ? String(item.group.id) : "" },
     });
-    const [loading, setLoading] = useState(false);
-    const [modal, setModal] = useState(false);
-    const [modalDel, setModalDel] = useState(false);
-    const [updateMode, setUpdateMode] = useState(false);
-    const [err,setErr] = useState("")
-    const [groups, setGroups] = useState([])
-    const url = `http://localhost:${port}/api/users`;
-    const userlogin = JSON.parse(localStorage.getItem("userlogin"))
-    const notify = (mssg) => {
-        toast.success(`${mssg}`, {
-            position: 'bottom-right',
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: 'colored',
-        });
-    };
+    setUpdateMode(true);
+    setFormErr("");
+    setModalOpen(true);
+  };
 
-    const fetchGroups = async () => {
-        setLoading(true);
-        const rep = await axios.get(`http://localhost:${port}/api/groups/professor/${userlogin.id}`);
-        setGroups(rep.data);
-        setLoading(false);
-    };
+  const closeModal = () => {
+    setModalOpen(false);
+    setStudent(EMPTY_STUDENT);
+    setUpdateMode(false);
+    setFormErr("");
+  };
 
-    const fetchStudents = async () => {
-        setLoading(true);
-        const rep = await axios.get(`${url}/students/${userlogin.id}`);
-        setStudents(rep.data);
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        fetchStudents()
-        fetchGroups()
-    }, []);
-
-    const handleStudent = (e) => {
-        setStudent({ ...student, [e.target.name]: e.target.value });
-    };
-
-    const handleGroup = (e) => {
-        setStudent({
-            ...student,
-            group: {
-                ...student.group,
-                id: e.target.value
-            }
-        })
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!student.firstName.trim() || !student.lastName.trim() || !student.email.trim()) {
+      setFormErr("First name, last name, and email are required.");
+      return;
     }
-
-    const handleUpdate = (id, code, year) => {
-        student.id = id
-        student.code = code
-        student.year = year
-        setUpdateMode(true)
-        openModal()
+    if (!updateMode && (!student.userName.trim() || !student.password || !student.group.id)) {
+      setFormErr("Username, password, and group are required for new students.");
+      return;
     }
-    const handleDelete = (id) => {
-        setStudent((current) => ({ ...current, id }))
-        openModaldel()
+    setSaving(true);
+    setFormErr("");
+    try {
+      if (updateMode) {
+        await axios.put(`${API_BASE}/users/update/${student.id}`, student);
+        toast.success("Student updated successfully.");
+      } else {
+        await axios.post(`${API_BASE}/users/register/student`, student);
+        toast.success("Student created successfully.");
+      }
+      closeModal();
+      await loadData();
+    } catch (err) {
+      const msg = err.response?.data?.message || "Could not save student.";
+      setFormErr(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
     }
+  };
 
-
-
-    const resetStudent = () => {
-        setStudent({
-            id: '',
-            userName: '',
-            firstName: '',
-            lastName: '',
-            password: '',
-            email: '',
-            number: '',
-            group: {
-                id: ''
-            }
-        })
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const rep = await axios.delete(
+        `${API_BASE}/users/delete/student/${userlogin.id}/${deleteTarget.id}`,
+        { headers: authHeaders() }
+      );
+      toast.success(rep.data?.message || "Student deleted successfully.");
+      setDeleteTarget(null);
+      await loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not delete this student.");
+    } finally {
+      setDeleting(false);
     }
-    const addStudent = async () => {
-        try {
-            const rep = await axios.post(`${url}/register/student`, student)
-        // console.log(student)
-        resetStudent()
-        fetchStudents();
-        closeModal()
-        notify('Student created successfully')
-        } catch (error) {
-            console.log(error.response.data.message)
-            setErr(error.response.data.message)
-            setTimeout(() => {
-              setErr('');
-            }, 500);
-        }
-        
-    }
-    const updateStudent = async () => {
-        const rep = await axios.put(`${url}/update/${student.id}`, student)
-        resetStudent()
-        fetchStudents()
-        closeModal()
-        setUpdateMode(false)
-    }
-    const deleteStudent = async () => {
-        try {
-          const rep = await axios.delete(`${url}/delete/student/${userlogin.id}/${student.id}`, {
-            headers: {
-              Authorization: `Bearer ${userlogin.token}`,
-            },
-          });
-      
-          notify(rep.data.message);
-          resetStudent();
-          fetchStudents();
-          closeModaldel();
-        } catch (error) {
-          toast.error(error.response?.data?.message || 'Could not delete this student.');
-        }
-      };
-      
+  };
 
-    const openModal = () => {
-        setModal(true);
-    };
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return students.filter((s) => {
+      if (groupFilter !== "all" && String(s.group?.id) !== groupFilter) return false;
+      if (!q) return true;
+      return [s.firstName, s.lastName, s.userName, s.email, s.number, s.group?.code]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [students, search, groupFilter]);
 
-    const closeModal = () => {
-        setModal(false);
-        resetStudent()
-        setUpdateMode(false)
-    };
-    const openModaldel = () => {
-        setModalDel(true);
-    };
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-    const closeModaldel = () => {
-        setModalDel(false);
-        resetStudent()
-    };
-
-    return (
-        <div className="w-full mt-20">
-            {loading ? (
-                <p></p>
-            ) : (
-                <>
-                    <div class="flex flex-col w-full border p-10 border-gray-200 rounded-xl bg-white">
-                        <button type="button" class="w-1/6 mb-1  py-3 px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:pointer-events-none dark:hover:bg-blue-900 dark:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                            onClick={openModal}>
-                            <FontAwesomeIcon icon={faPlus} />
-                            Add new student
-                        </button>
-
-                        <div class="-m-1.5 overflow-x-auto">
-                            <div class="p-1.5 min-w-full inline-block align-middle">
-                                <div class="overflow-hidden rounded-t-2xl">
-                                    <table class="min-w-full divide-y mt-1 divide-gray-200 dark:divide-gray-700">
-                                        <thead className='bg-gray-200 '>
-                                            <tr>
-                                                <th scope="col" class="px-8 py-3 text-start text-xs font-medium text-gray-500 uppercase">Id</th>
-                                                <th scope="col" class="px-8 py-3 text-start text-xs font-medium text-gray-500 uppercase">Image</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">userName</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">Email</th>
-                                                <th scope="col" class="pl-32 py-3 text-start text-xs font-medium text-gray-500 uppercase">Group</th>
-                                                <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Delete</th>
-                                                <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Update</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {students.map((student, index) => (
-                                                <tr>
-                                                    <td class="px-8 py-3 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">{student.id}</td>
-                                                    <img src={student.photo ===null ? Prof : `data:image/png;base64, ${student.photo}`} className='mx-8 my-1  text-start w-10 h-10 rounded-full'/>
-                                                    <td class="pl-32 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{student.userName}</td>
-                                                    <td class="pl-32 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{student.email}</td>
-                                                    <td class="pl-32 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{student.group.code}</td>
-                                                    <td class="px-6 py-3 whitespace-nowrap text-end text-sm font-medium">
-                                                        <button type="button" class="inline-flex items-center pr-3 gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                                                            onClick={() => handleDelete(student.id)}>
-                                                            <FontAwesomeIcon icon={faTrash} />
-                                                        </button>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                                                        <button type="button" class="inline-flex items-center pr-3 gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                                                            onClick={() => handleUpdate(student.id, student.code, student.year)}>
-                                                            <FontAwesomeIcon icon={faPen} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-                    {modal && (
-                        <div
-                            className="w-full h-full fixed top-0 left-0 z-[60] bg-black bg-opacity-50 flex justify-center items-center"
-                        //   onClick={closeModal}
-                        >
-                            <div className="bg-white w-full max-w-md p-4 rounded-xl p-5">
-                                <h3 className="font-bold text-gray-800 mb-3 text-center">
-                                    Add student
-                                </h3>
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">First Name</label>
-                                <input type="text" id="input-label"
-                                    name='firstName'
-                                    value={student.firstName}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="first-name" />
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Last Name</label>
-                                <input type="text" id="input-label"
-                                    name='lastName'
-                                    value={student.lastName}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="last-name" />
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">User Name</label>
-                                <input type="text" id="input-label"
-                                    name='userName'
-                                    value={student.userName}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="user-name" />
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Email</label>
-                                <input type="email" id="input-label"
-                                    name='email'
-                                    value={student.email}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="email "/>
-                                     <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Password</label>
-                                <input type="password" id="input-label"
-                                    name='password'
-                                    value={student.password}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="password" />
-                                    
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Number</label>
-                                <input type="text" id="input-label"
-                                    name='number'
-                                    value={student.number}
-                                    onChange={handleStudent}
-                                    class="py-3  w-full px-4  border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" placeholder="number" />
-                                <label for="input-label" class="block text-sm font-medium mb-2 dark:text-white">Group</label>
-                                <select value={student.group.id} onChange={handleGroup} class="py-3 px-4 pe-9 block w-full border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
-                                    <option selected>Select group</option>
-                                    {groups.map((group,index) =>(
-                                          <option value={group.id}>{group.code}</option>
-                                    ))}
-                                </select>
-                                {err && <p class="text-sm text-red-600 mt-2" >{err}</p>}
-                                <div className="flex justify-end mt-4">
-                                    <button
-                                        type="button"
-                                        className="py-2 px-3 mr-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50"
-                                        onClick={closeModal}
-                                    >
-                                        Close
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700"
-                                        onClick={addStudent}
-                                    >
-                                        add
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-            {modalDel && (
-                <div
-                    className="w-full h-full fixed top-0 left-0 z-[60] bg-black bg-opacity-50 flex justify-center items-center"
-                //   onClick={closeModal}
-                >
-                    <div className="flex flex-col items-center bg-white w-full max-w-md  rounded-xl p-5">
-                        <h3 className="font-bold text-xl text-gray-800 mb-3 text-center">
-                            Delete student
-                        </h3>
-                        <span class=" flex-shrink-0 inline-flex justify-center items-center mb-2 sm:w-[62px] sm:h-[62px] rounded-full border-4 border-red-50 bg-red-100 text-red-500 dark:bg-red-700 dark:border-red-600 dark:text-red-100">
-                            <svg class="flex-shrink-0 w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
-                            </svg>
-                        </span>
-                        <h3 className="text-center text-sm text-gray-600 mb-3 ">
-                            Are you sure you want to delete this student and their submissions?
-                        </h3>
-
-                        <div className="flex justify-end mt-4">
-                            <button
-                                type="button"
-                                className="py-2 px-3 mr-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50"
-                                onClick={closeModaldel}
-                            >
-                                Close
-                            </button>
-                            <button
-                                type="button"
-                                className="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700"
-                                onClick={deleteStudent}
-                            >
-                                delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-            />
+  const columns = [
+    {
+      key: "student",
+      label: "Student",
+      render: (s) => (
+        <div className="flex items-center gap-3">
+          <Avatar photo={s.photo} firstName={s.firstName} lastName={s.lastName} size="sm" />
+          <div>
+            <p className="font-medium text-[#0F172A]">
+              {s.firstName} {s.lastName}
+            </p>
+            <p className="text-xs text-slate-500">@{s.userName}</p>
+          </div>
         </div>
-    );
+      ),
+    },
+    { key: "email", label: "Email", render: (s) => <span className="text-slate-600">{s.email}</span> },
+    { key: "number", label: "Phone", render: (s) => <span className="text-slate-600">{s.number || "—"}</span> },
+    { key: "group", label: "Group", render: (s) => <span className="text-slate-600">{s.group?.code || "—"}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (s) => (
+        <div className="inline-flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
+            <FontAwesomeIcon icon={faPen} className="h-3 w-3" aria-hidden="true" />
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteTarget(s)}
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            <FontAwesomeIcon icon={faTrash} className="h-3 w-3" aria-hidden="true" />
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
+  return (
+    <div>
+      <PageHeader
+        title="Students"
+        description="Enroll students into your academic groups and maintain their contact details."
+        actions={
+          <Button onClick={openCreate}>
+            <FontAwesomeIcon icon={faPlus} className="h-3.5 w-3.5" aria-hidden="true" />
+            Add student
+          </Button>
+        }
+      />
 
-}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchInput
+          id="prof-student-search"
+          label="Search students"
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+          placeholder="Search by name, email, or phone..."
+          className="sm:w-72"
+        />
+        <FilterSelect
+          id="prof-student-group-filter"
+          label="Filter by group"
+          value={groupFilter}
+          onChange={(e) => {
+            setGroupFilter(e.target.value);
+            setPage(1);
+          }}
+          className="sm:w-48"
+          options={[
+            { value: "all", label: "All groups" },
+            ...groups.map((g) => ({ value: String(g.id), label: g.code })),
+          ]}
+        />
+      </div>
 
-export default Student
+      {loading ? (
+        <LoadingState label="Loading students..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={loadData} />
+      ) : (
+        <>
+          <DataTable
+            columns={columns}
+            rows={pageRows}
+            rowKey={(s) => s.id}
+            emptyState={
+              <EmptyState
+                title="No students found"
+                description="Add a student to one of your groups or adjust your search filter."
+                action={
+                  <Button size="sm" onClick={openCreate}>
+                    <FontAwesomeIcon icon={faPlus} className="h-3 w-3" aria-hidden="true" />
+                    Add student
+                  </Button>
+                }
+              />
+            }
+          />
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-600">
+              <span>
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
+                {filtered.length}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={updateMode ? "Edit student" : "Add student"}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeModal} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" form="student-form" loading={saving}>
+              {updateMode ? "Save changes" : "Create student"}
+            </Button>
+          </>
+        }
+      >
+        <form id="student-form" onSubmit={handleSave} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField id="stu-firstName" label="First name" required>
+              <input
+                id="stu-firstName"
+                name="firstName"
+                value={student.firstName}
+                onChange={(e) => setStudent((s) => ({ ...s, firstName: e.target.value }))}
+                required
+                className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              />
+            </FormField>
+            <FormField id="stu-lastName" label="Last name" required>
+              <input
+                id="stu-lastName"
+                name="lastName"
+                value={student.lastName}
+                onChange={(e) => setStudent((s) => ({ ...s, lastName: e.target.value }))}
+                required
+                className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              />
+            </FormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField id="stu-userName" label="Username" required={!updateMode}>
+              <input
+                id="stu-userName"
+                name="userName"
+                value={student.userName}
+                onChange={(e) => setStudent((s) => ({ ...s, userName: e.target.value }))}
+                required={!updateMode}
+                className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              />
+            </FormField>
+            <FormField id="stu-number" label="Phone number">
+              <input
+                id="stu-number"
+                name="number"
+                value={student.number}
+                onChange={(e) => setStudent((s) => ({ ...s, number: e.target.value }))}
+                className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              />
+            </FormField>
+          </div>
+          <FormField id="stu-email" label="Email" required>
+            <input
+              id="stu-email"
+              type="email"
+              name="email"
+              value={student.email}
+              onChange={(e) => setStudent((s) => ({ ...s, email: e.target.value }))}
+              required
+              className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+            />
+          </FormField>
+          {!updateMode && (
+            <FormField id="stu-password" label="Password" required>
+              <input
+                id="stu-password"
+                type="password"
+                name="password"
+                value={student.password}
+                onChange={(e) => setStudent((s) => ({ ...s, password: e.target.value }))}
+                required
+                className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+              />
+            </FormField>
+          )}
+          <FormField id="stu-group" label="Group" required={!updateMode}>
+            <select
+              id="stu-group"
+              value={student.group.id}
+              onChange={(e) =>
+                setStudent((s) => ({ ...s, group: { ...s.group, id: e.target.value } }))
+              }
+              required={!updateMode}
+              className="block w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#0F766E] focus:ring-[#0F766E]"
+            >
+              <option value="">Select a group</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.code}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          {formErr && (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formErr}
+            </p>
+          )}
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title="Delete student"
+        message={
+          deleteTarget
+            ? `Delete ${deleteTarget.firstName} ${deleteTarget.lastName} (${deleteTarget.email}) and their submissions?`
+            : ""
+        }
+        confirmLabel="Delete student"
+      />
+    </div>
+  );
+};
+
+export default Student;

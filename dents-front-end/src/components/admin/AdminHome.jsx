@@ -1,69 +1,33 @@
-
-import Sidebar from './../Sidebar'
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Logout from '../auth/Logout';
-import Professors from './Professors';
-import SideBarAdmin from './SideBarAdmin'
+import { faUserTie } from "@fortawesome/free-solid-svg-icons";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import AppShell from "../../layouts/AppShell";
+import Professors from "./Professors";
+import { getAuthUser } from "../../utils/api";
 
 const AdminHome = () => {
-  const [user, setuser] = useState([]);
-  const port = import.meta.env.VITE_PORT_SPRING;
-
-  const fetchapi = () => {
-    axios.get(`http://localhost:${port}/api/users/allProfessor`)
-    .then(response => {
-      setuser(response.data); 
-    })
-    .catch(error => {
-      console.error('Error fetching data:', error);
-    });
-  };
-  
-
-  useEffect(() => {
-    fetchapi();
-  }, []); 
-  const handleActivateToggle = (userId) => {
-    // Mettez à jour l'état localement
-    setuser((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === userId ? { ...user, activate: !user.activate } : user
-      )
-    );
-
-    axios
-      .post(`http://localhost:${port}/api/users/activate/${userId}`)
-      .then((response) => {
-        // Mise à jour réussie
-      })
-      .catch((error) => {
-        console.error('Error updating activate status:', error);
-      
-        setuser((prevUsers) =>
-          prevUsers.map((user) =>
-            user.id === userId ? { ...user, activate: !user.activate } : user
-          )
-        );
-      });
-  };
-
-
-
-
-
-
+  const userlogin = getAuthUser();
+  const navItems = [
+    {
+      key: "professors",
+      label: "Professors",
+      icon: faUserTie,
+      to: "/admin",
+      active: true,
+    },
+  ];
 
   return (
-   
-   <>
-   <Logout/>
-   <SideBarAdmin />
-   <div class="lg:ml-64">
-    <Professors/>
-  </div>
-   </>
-  )
-}
+    <AppShell
+      roleLabel="Administrator"
+      pageTitle="Professor Management"
+      navItems={navItems}
+      user={userlogin}
+    >
+      <Professors />
+      <ToastContainer position="bottom-right" autoClose={3000} theme="light" />
+    </AppShell>
+  );
+};
 
-export default AdminHome
+export default AdminHome;

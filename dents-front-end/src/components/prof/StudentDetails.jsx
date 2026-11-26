@@ -1,284 +1,248 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Prof from '../../assets/b.png'
-import { faCircleCheck, faCircleExclamation, faPlus, faTrash, faNoteSticky, faEnvelope, faRefresh, faPhone, faPen, faClose, faAdd, faHouse, faUser, faPeopleGroup, faTooth, faGear, faPaperclip } from '@fortawesome/free-solid-svg-icons';
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
-import Chart from "chart.js/auto";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
+import axios from "axios";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCheckCircle,
+  faClock,
+  faDownload,
+  faEnvelope,
+  faPeopleGroup,
+  faPhone,
+} from "@fortawesome/free-solid-svg-icons";
+import "chart.js/auto";
 import { Line } from "react-chartjs-2";
+import Avatar from "../ui/Avatar";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
+import StatusBadge from "../ui/StatusBadge";
+import SubmissionReview from "../SubmissionReview";
+import { EmptyState, ErrorState, LoadingState } from "../ui/States";
+import { API_BASE } from "../../utils/api";
+import { exportSubmissionPdf } from "../../utils/pdfExport";
 
-const StudentDetails = (props) => {
-    const port = import.meta.env.VITE_PORT_SPRING;
-    const studentId = props.id
-    const [student, setStudent] = useState({})
-    const [loading, setLoading] = useState(false)
-    const [doTp, setDoTp] = useState([])
-    const url = `http://localhost:${port}/api/users`;
-    const [modal, setModal] = useState(false)
-    const [studentPw, setStudentPw] = useState({})
-    const [pw, setPw] = useState({})
-    const [labels, setLabels] = useState([])
-    const [notes, setNotes] = useState([])
+const formatScore = (val) => Number((Number(val) || 0).toFixed(2));
 
-    const studentData = {
-        labels: ['TP1', 'TP2', 'TP3', 'TP4', 'TP5'],
-        data: [80, 85, 75, 90, 88],
-    };
-    const fetshUser = async () => {
-        try {
-            const rep = await axios.get(`${url}/${studentId}`)
-            setStudent(rep.data)
-            console.log(rep.data)
-            let tab = []
-            let tabnote =[]
-            for(let i=0; i<rep.data.group.pws.length; i++){
-                let c = 0
-                tab.push(rep.data.group.pws[i].title)
-                for (let j=0; j<rep.data.studentPWS.length;j++){
-                    if(rep.data.studentPWS[j].id.pw_id == rep.data.group.pws[i].id){
-                        c = rep.data.studentPWS[j].noteSide + rep.data.studentPWS[j].noteFront
-                    }
-                }
-                tabnote.push(c)
-            }
-            setLabels(tab)
-            setNotes(tabnote)
-            
+const StudentDetails = ({ id }) => {
+  const [student, setStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [doTp, setDoTp] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [studentPw, setStudentPw] = useState(null);
+  const [selectedPw, setSelectedPw] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
-        } catch (error) {
-            console.log(error)
-        }
+  const loadStudent = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [userRes, tpRes] = await Promise.all([
+        axios.get(`${API_BASE}/users/${id}`),
+        axios.get(`${API_BASE}/users/testpw/${id}`),
+      ]);
+      setStudent(userRes.data);
+      setDoTp(Array.isArray(tpRes.data) ? tpRes.data : []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load student details.");
+    } finally {
+      setLoading(false);
     }
-    const fetsDoTp = async () => {
-        try {
-            const rep = await axios.get(`${url}/testpw/${studentId}`)
-            setDoTp(rep.data)
-            console.log(rep.data[0])
-        } catch (error) {
-            console.log(error)
-        }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadStudent();
+  }, [id, loadStudent]);
+
+  const chartSeries = useMemo(() => {
+    const pws = student?.group?.pws || [];
+    const submissions = student?.studentPWS || [];
+    const labels = [];
+    const notes = [];
+    for (const pw of pws) {
+      labels.push(pw.title);
+      const match = submissions.find((s) => s.id?.pw_id === pw.id);
+      notes.push(match ? formatScore((match.noteSide || 0) + (match.noteFront || 0)) : 0);
     }
+    return { labels, notes };
+  }, [student]);
 
-    useEffect(() => {
-        setLoading(true);
-        fetshUser();
-        fetsDoTp();
-        setLoading(false);
-    }, []);
+  const openSubmissionModal = (pwItem) => {
+    const submissions = student?.studentPWS || [];
+    const found = submissions.find((s) => s.id?.pw_id === pwItem.id) || null;
+    if (!found) return;
+    setSelectedPw(pwItem);
+    setStudentPw(found);
+    setModalOpen(true);
+  };
 
-    const openModal = (studentId, pwcurrent) => {
-        setPw(pwcurrent)
-        let stpws = student.studentPWS
-        for (let i = 0; i < stpws.length; i++) {
-            if (studentId === stpws[i].id.student_id || pwcurrent.id === stpws[i].id.pw_id) {
-                setStudentPw(stpws[i])
-                break
-            }
-        }
-        setModal(true);
-    };
+  const closeModal = () => {
+    setModalOpen(false);
+    setStudentPw(null);
+    setSelectedPw(null);
+  };
 
-    const closeModal = () => {
-        setModal(false);
-        setStudentPw({})
-        setPw({})
-    };
-    const downloadPdfDocument = () => {
-        const input = document.getElementById('modal');
-        const downloadButton = input.querySelector('.bg-blue-500');
-        if (downloadButton) {
-            downloadButton.remove();
-        }
-        html2canvas(input)
-            .then((canvas) => {
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF();
-                const pdfWidth = 210;
-                const pdfHeight = 297;
-                const imgWidth = pdfWidth - 20;
-                const imgHeight = (imgWidth / canvas.width) * canvas.height;
-                pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
-                pdf.save(`${student.lastName + pw.title}.pdf`);
-            });
+  const downloadPdfDocument = async () => {
+    if (!student || !selectedPw || !studentPw) return;
+    setExporting(true);
+    try {
+      await exportSubmissionPdf({ student, pw: selectedPw, submission: studentPw });
+    } finally {
+      setExporting(false);
     }
-    // const labels = ["January", "February", "March", "April", "May", "June"];
+  };
 
-    const options = {
-        animations: {
-            tension: {
-              duration: 3000,
-              easing: 'easeOutQuad',
-              from: 1,
-              to: 0,
-              loop: true
-            }
-        },
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: 'Practical work\' list ', 
-            },
-          },
-          y: {
-            title: {
-              display: true,
-              text: 'Scores', 
-            },
-            suggestedMin: 0, 
-          },
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-      };
-      
-      const data = {
-        labels: labels,
-        datasets: [
-          {
-            label: "",
-            backgroundColor: "rgb(255, 99, 132)",
-            borderColor: "rgb(255, 99, 132)",
-            data: notes,
-          },
-        ],
-      };
-    return (
+  if (loading) return <LoadingState label="Loading student submission history..." />;
+  if (error) return <ErrorState message={error} onRetry={loadStudent} />;
+  if (!student) return <EmptyState title="Student not found" />;
 
-        <div className='flex flex-col items-center w-4/5 mt-10'>
-            {!loading && student.group && student.group.pws ?
-                <>
-                    <div className='flex flex-col items-center w-full'>
+  const pws = student.group?.pws || [];
+  const chartData = {
+    labels: chartSeries.labels,
+    datasets: [
+      {
+        label: "Prototype total score (/20)",
+        backgroundColor: "rgba(15, 118, 110, 0.15)",
+        borderColor: "#0F766E",
+        pointBackgroundColor: "#0F766E",
+        tension: 0.25,
+        data: chartSeries.notes,
+      },
+    ],
+  };
 
-                        <div className='flex py-5  bg-white rounded-xl shadow-md w-4/5  justify-center items-center'>
-                            <span className='flex w-2/5 justify-center'>
-                                <img src={student.photo === null ? Prof : `data:image/png;base64, ${student.photo}`} className='w-36 h-36 rounded-full mx-2 border-4 border-gray-300' />
-                            </span>
-                            <div className='flex flex-col gap-1 mx-1 w-3/5'>
-                                <p className='text-2xl font-semibold text-gray-700'>{student.firstName} {student.lastName}</p>
-                                <p className='text-lg py-1 text-gray-600'><FontAwesomeIcon icon={faEnvelope} className='mr-2' /> {student.email}</p>
-                                <p className='text-lg py-1 text-gray-600'><FontAwesomeIcon icon={faPhone} className='mr-2' />{student.number}</p>
-                                <p className='text-lg py-1 text-gray-600'><FontAwesomeIcon icon={faPeopleGroup} className='mr-2' />{student.group.code}</p>
-                            </div>
-                        </div>
-                        <div className='flex justify-center mt-8 w-full'>
-                            {student.group.pws.length !== 0 ? (
-                                <div className={`w-4/5 grid grid-cols-${Math.min(student.group.pws.length, 4)} gap-4`}>
-                                    {student.group.pws.map((pw, index) => (
-                                        <span key={index}
-                                            className={`relative flex flex-col border-2 px-2 py-4 justify-center hover:scale-105 ${doTp[index] ? 'hover:cursor-pointer  border-green-600' : ' border-red-600'} items-center bg-white rounded-lg shadow-md`}
-                                            onClick={() => doTp[index] && openModal(student.id, pw)}
-                                        >
-                                            <p className='text-2xl font-semibold text-blue-400 mb-2'>{pw.title}</p>
-                                            <p className='text-md text-gray-400'>{pw.objectif}</p>
-                                            {doTp[index] ?
-                                                <FontAwesomeIcon icon={faCircleCheck} className='absolute text-green-600 top-1 right-1' />
-                                                :
-                                                <FontAwesomeIcon icon={faCircleExclamation} className='absolute text-red-600 top-1 right-1' />}
-                                        </span>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p>no pw to display</p>
-                            )}
-                        </div>
-                        <div className='w-full h-[430px] flex flex-col items-center justify-center p-4'>
-                            <p className='text-2xl font-medium mt-20 mb-3'>Student's Progression</p>
-                            <Line data={data} options={options} className='bg-gray-50 rounded-lg p-4' />
-                        </div>
-                    </div>
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { title: { display: true, text: "Practical work" } },
+      y: { title: { display: true, text: "Score (/20)" }, suggestedMin: 0, suggestedMax: 20 },
+    },
+    plugins: { legend: { display: true, position: "top" } },
+  };
 
-                </>
-
-
-
-
-                : (
-                    <p>Loading</p>
-                )}
-            {modal &&
-                <div className="w-full h-full fixed top-0 left-0 z-[60] bg-black bg-opacity-60 flex justify-center items-center" id='modal'>
-                    <div className="bg-white w-3/5 relative  rounded-xl p-5 flex flex-col items-center">
-                        <p className='font-bold text-4xl text-gray-800 mb-5'>{student.lastName}-{pw.title}</p>
-                        <div className='flex justify-center  gap-5 items-center w-full '>
-                            <div className='flex flex-col justify-center items-center w-1/2 bg-green-200 rounded-lg p-1 '>
-                                <p className='font-bold text-2xl text-green-600 mb-3'>Front Image</p>
-                                <img
-                                    src={`data:image/png;base64, ${studentPw.imageFront}`} className=' '
-                                />
-                                <div className='flex gap-3 justify-center items-center w-full my-2'>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles1</p>
-                                        <p>{studentPw.af1}</p>
-                                        <p>{studentPw.af2}</p>
-                                    </span>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles2</p>
-                                        <p>{studentPw.bf1}</p>
-                                        <p>{studentPw.bf2}</p>
-                                    </span>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles3</p>
-                                        <p>{studentPw.cf1}</p>
-                                        <p>{studentPw.cf2}</p>
-                                    </span>
-                                </div>
-                                <p className='font-medium text-xl text-gray-500 mb-3'>Note : {studentPw.noteFront}/10</p>
-                            </div>
-                            <div className='flex flex-col justify-center items-center w-1/2 bg-blue-200 rounded-lg p-1'>
-                                <p className='font-bold text-2xl text-blue-600 mb-3'>Side Image</p>
-                                <img
-                                    src={`data:image/png;base64, ${studentPw.imageSide}`}
-                                />
-                                <div className='flex gap-3 justify-center items-center w-full my-2'>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles1</p>
-                                        <p>{studentPw.as1}</p>
-                                        <p>{studentPw.as2}</p>
-                                    </span>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles2</p>
-                                        <p>{studentPw.bs1}</p>
-                                        <p>{studentPw.bs2}</p>
-                                    </span>
-                                    <span className='flex flex-col w-1/3 justify-center items-center gap-1 text-lg mb-2'>
-                                        <p className='text-gray-600 text-xl font-semibold'>Angles3</p>
-                                        <p>{studentPw.cs1}</p>
-                                        <p>{studentPw.cs2}</p>
-                                    </span>
-                                </div>
-                                <p className='font-medium text-xl text-gray-500 mb-3'>Note : {studentPw.noteSide}/10</p>
-                            </div>
-                            
-                        </div>
-
-                        {/* <p className='py-32'>{studentPw.as2}</p> */}
-                        <button
-
-                            type="button"
-                            className=" absolute top-7 right-7 font-medium rounded-full   text-red-600 text-xl hover:text-red-800"
-                            onClick={closeModal}
-                        >
-                            <FontAwesomeIcon icon={faClose} />
-                        </button>
-                        <p className='absolute top-5 left-7 flex justify-center items-center text-xl font-medium text-red-500 bg-red-200 border border-red-500 p-3 rounded-full w-24 h-24'>{studentPw.noteFront+studentPw.noteSide}/20</p>
-                        <button
-                            type="button"
-                            className="bg-blue-500  text-white px-4 py-2 rounded-md mt-4"
-                            onClick={downloadPdfDocument}
-                        >
-                            Télécharger en PDF
-                        </button>
-                    </div>
-                </div>
-
-            }
+  return (
+    <div className="space-y-6">
+      <section className="flex flex-col items-start gap-5 rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm sm:flex-row sm:items-center">
+        <Avatar
+          photo={student.photo}
+          firstName={student.firstName}
+          lastName={student.lastName}
+          size="lg"
+        />
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold text-[#0F172A]">
+            {student.firstName} {student.lastName}
+          </h2>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <FontAwesomeIcon icon={faEnvelope} className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              {student.email}
+            </span>
+            {student.number && (
+              <span className="inline-flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faPhone} className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                {student.number}
+              </span>
+            )}
+            {student.group?.code && (
+              <span className="inline-flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faPeopleGroup} className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                {student.group.code}
+              </span>
+            )}
+          </div>
         </div>
-    )
-}
+      </section>
 
-export default StudentDetails
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+          Assigned practical work
+        </h3>
+        {pws.length === 0 ? (
+          <EmptyState
+            title="No practical work assigned"
+            description="This student's group has no practical-work assignments yet."
+          />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pws.map((pwItem, index) => {
+              const submitted = Boolean(doTp[index]);
+              return (
+                <div
+                  key={pwItem.id}
+                  className="flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-semibold text-[#0F172A]">{pwItem.title}</h4>
+                      <StatusBadge tone={submitted ? "success" : "warning"}>
+                        <FontAwesomeIcon
+                          icon={submitted ? faCheckCircle : faClock}
+                          className="h-3 w-3"
+                          aria-hidden="true"
+                        />
+                        {submitted ? "Submitted" : "Pending"}
+                      </StatusBadge>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{pwItem.objectif}</p>
+                  </div>
+                  <div className="mt-4">
+                    <Button
+                      variant={submitted ? "primary" : "secondary"}
+                      size="sm"
+                      disabled={!submitted}
+                      onClick={() => openSubmissionModal(pwItem)}
+                      className="w-full"
+                    >
+                      {submitted ? "Inspect submission" : "Awaiting submission"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {pws.length > 0 && (
+        <section className="rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">Student progression</h3>
+          <div className="h-72">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+        </section>
+      )}
+
+      <Modal
+        open={modalOpen && Boolean(studentPw) && Boolean(selectedPw)}
+        onClose={closeModal}
+        bodyId="modal"
+        size="xl"
+        title={studentPw && selectedPw ? `${student.lastName}-${selectedPw.title}` : "Submission review"}
+        subtitle={`${student.firstName} ${student.lastName} • ${studentPw?.date || ""} ${studentPw?.time || ""} • Prototype educational measurement`}
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2.5">
+            <Button variant="secondary" onClick={closeModal}>
+              Close
+            </Button>
+            <Button onClick={downloadPdfDocument} loading={exporting}>
+              <FontAwesomeIcon icon={faDownload} className="h-3.5 w-3.5" aria-hidden="true" />
+              Télécharger en PDF
+            </Button>
+          </div>
+        }
+      >
+        {studentPw && (
+          <SubmissionReview student={student} pw={selectedPw} submission={studentPw} />
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+StudentDetails.propTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+};
+
+export default StudentDetails;

@@ -1,85 +1,74 @@
-# E-Dent Web Platform
+# eDent — Dental Education & Practical Work Platform
 
-E-Dent is a full-stack educational platform for managing dental practical work. It connects administrators, professors, and students through role-based dashboards. Administrators can manage and activate professor accounts, professors can organize groups, students, teeth, and practical assignments, and students can review their assigned work and submit tooth analyses.
+eDent is a full-stack educational platform for managing dental practical work. It connects **Administrators**, **Professors**, and **Students** through role-based academic workspaces:
 
-The application uses a Spring Boot and MySQL backend with a React, Vite, and Tailwind CSS frontend. It includes authentication, account activation, password recovery, progress tracking, practical-work management, image storage, and PDF reporting.
+- **Administrators**: Manage, activate, and deactivate professor accounts.
+- **Professors**: Organize student cohorts, manage anatomical tooth references and practical-work assignments, inspect student submissions, view group statistics, and export PDF reports.
+- **Students**: Track assigned practical work, upload front and side tooth illustrations/images, place 9 landmarks per view in the Tooth Analysis Studio, review prototype scores, and manage personal profile details.
 
-## Project authorship
+> **Educational Prototype Disclaimer**: The tooth-angle measurements and scoring use prototype geometric definitions for educational demonstration only. They are not clinically validated and must not be used for clinical diagnosis or treatment decisions.
 
-This project was originally created by **Yahya Mourid** and was later enhanced and modernized by **Aymen Alioua**.
+## Project Authorship
 
-## Enhancements
+Originally created by **Yahya Mourid**, enhanced and modernized by **Aymen Alioua**.
 
-The enhanced version introduces:
+## Required Software
 
-- A dynamic student dashboard connected to the existing Spring Boot API.
-- Front and side tooth-image uploads with interactive landmark selection.
-- Prototype calculation of cervical, axial, and incisal/occlusal angles.
-- Storage and professor-side display of calculated angles, images, and scores.
-- Editable student profile information with persistent backend updates.
-- Functional and secured deletion workflows for professors, students, and groups.
-- Automatic cleanup of student submissions and practical-work relationships during deletion.
-- A repaired password-recovery flow with secure one-time codes and expiration handling.
-- Gmail SMTP configuration through environment variables so credentials are not committed.
-- Improved endpoint validation, authorization checks, error messages, and dashboard feedback.
-- Updated project ownership, seeded professor credentials, documentation, and GitHub configuration.
+- **Node.js** 18+ (verified with Node v22.13.1 / npm 10.9.2)
+- **Java** 17+ (targets Java 17; verified with JDK 21.0.4)
+- **MySQL** 8.x (or Docker Compose)
 
-> The tooth-angle feature uses prototype geometric definitions and is intended for demonstration and educational purposes, not clinical diagnosis or real-world treatment decisions.
+## Local Database Setup & Import
 
-## Installation
+The repository includes a sanitized, synthetic demonstration dataset in [`dents.sql`](dents.sql) (1 administrator, 6 professors, 48 students, 6 groups, 12 teeth, 10 practical works, and 51 completed submissions with procedurally generated tooth illustrations).
+
+```sql
+CREATE DATABASE IF NOT EXISTS dents;
 ```
-git clone https://github.com/aymenALa/DENT-WEB
-
-```
-### Using Docker 
-
-Copy `.env.example` to `.env`, then run:
-
-```
-docker-compose build
-docker-compose up
-```
-- Connect to the PhpMyAdmin server in Docker on port 8081 with the credentials 'root' for both username and password
-- Restart the back-end project from docker desktop
-
-### Email configuration
-
-Email is sent through Gmail SMTP. Enable two-step verification on the sending Google account, create a Google App Password, and provide it through environment variables before starting the back end:
 
 ```powershell
-$env:MAIL_USERNAME="fiverr.affiliate.aa@gmail.com"
-$env:MAIL_PASSWORD="your-16-character-app-password"
+mysql -h 127.0.0.1 -P 3307 -u root dents < dents.sql
 ```
 
-Never commit the App Password or your regular Gmail password to this repository.
+> Default Spring Boot configuration in `dents-back-end/src/main/resources/application.properties` targets `jdbc:mysql://localhost:3307/dents?serverTimezone=UTC` (override via `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` as needed).
 
+## Environment Variables
 
+- **Backend**:
+  - `SPRING_DATASOURCE_URL` (optional override, e.g. `jdbc:mysql://127.0.0.1:3308/edent_test?serverTimezone=UTC`)
+  - `SPRING_DATASOURCE_USERNAME`
+  - `SPRING_DATASOURCE_PASSWORD`
+  - `MAIL_USERNAME` (Gmail SMTP username for account/password-recovery emails)
+  - `MAIL_PASSWORD` (Google App Password; never commit real credentials)
+- **Frontend** (`dents-front-end/.env` or process environment):
+  - `VITE_PORT_SPRING=5050`
 
+## Running Locally
 
+### Backend (Maven Wrapper)
 
-### Using mvn and npm
-- cd dents-back-end
+```powershell
+cd dents-back-end
+.\mvnw.cmd test
+.\mvnw.cmd spring-boot:run
 ```
-mvn clean install
-mvn spring-boot:run 
-```
 
-- cd dents-front-end
-```
+### Frontend (Vite)
+
+```powershell
+cd dents-front-end
 npm install
 npm run dev
 ```
-- visualiser le site-web en local
-```
- http://localhost:5173/
-```
-### Data base
-- Import the 'dents.sql' database file into your local MySQL server 
 
-### Accounts:
-- Admin : admin@gmail.com / admin
-- Prof : aymenalioua@gmail.com / qwerty
+Open `http://localhost:5173/`.
 
+## Local Demo Accounts
 
+> **Demo-Only Warning**: These synthetic accounts are strictly for local demonstration and testing. Do not enable or reuse them in production deployments.
 
-
+| Role | Email | Password |
+|---|---|---|
+| **Administrator** | `admin.synth@test.local` | `SynthAdmin!23` |
+| **Professor** | `prof.synth@test.local` | `SynthProf!23` |
+| **Student** | `student.synth@test.local` | `SynthStud!23` |

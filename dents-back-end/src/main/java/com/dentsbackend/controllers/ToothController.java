@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/teeth")
-@CrossOrigin(origins = "*")
 public class ToothController {
     @Autowired
     ToothService toothService;
