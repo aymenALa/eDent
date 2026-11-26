@@ -32,6 +32,7 @@
 
 ## Table of Contents
 
+- [Application Modes](#application-modes)
 - [Architecture Diagrams](#architecture-diagrams)
 - [Technology Stack](#technology-stack)
 - [Product Screenshots](#product-screenshots)
@@ -41,6 +42,22 @@
 - [Project Structure](#project-structure)
 - [Security, Testing & Limitations](#security-testing--limitations)
 - [Project Authorship](#project-authorship)
+
+---
+
+## Application Modes
+
+eDent supports two distinct runtime modes controlled by `VITE_DEMO_MODE`:
+
+- **Full-Stack Mode** (`ui-enhancement` / `main`, `VITE_DEMO_MODE=false` or unset):
+  - Architecture: **React + Spring Boot + MySQL/TiDB + JWT authentication**.
+  - Requires a running backend and database; uses real password/BCrypt login, JWT tokens, and server-side role/ownership enforcement.
+- **Interactive Portfolio Demo Mode** (`portfolio-demo` branch, `VITE_DEMO_MODE=true`):
+  - Architecture: **React + Centralized Demo Adapter + IndexedDB** (`edent_portfolio_demo`), seeded on first visit from `edent-frontend/public/demo-seed.json` (`55` users, `6` groups, `12` teeth, `10` practical works, `32` group assignments, `54` submissions).
+  - **Passwordless Access (`/demo`)**: Visitors can explore as **Administrator**, **Professor**, or **Student** without entering a password or connecting to any backend.
+  - **Browser-Local Persistence**: Changes (activations, groups, students, PWs, tooth-image landmark submissions) persist in the visitor's own browser via IndexedDB across refreshes.
+  - **Role Switching & Reset**: An in-workspace demo bar lets visitors switch between Admin, Professor, and Student seamlessly or click **Reset demo data** (with confirmation) to restore the initial synthetic dataset.
+  - **Sample Tooth Images**: The Tooth Analysis Studio provides sample front/side tooth illustrations in demo mode so visitors can test 9-landmark geometry, scoring, and PDF export without uploading local files.
 
 ---
 
@@ -402,8 +419,9 @@ Run the interactive portfolio demo **without Java, Maven, or MySQL**:
    VITE_DEMO_MODE=true npm run dev
    ```
 
-3. **Build production bundle**:
+3. **Build production bundle & run regression tests**:
    ```bash
+   npm test
    npm run build
    ```
 
@@ -444,6 +462,7 @@ eDent/
 │   │   ├── layouts/                # AppShell & AuthLayout
 │   │   ├── pages/                  # LandingPage, DemoAccess
 │   │   └── utils/                  # api.js, annotationCanvas.js, pdfExport.js
+│   ├── tests/                      # Automated regression tests (demoAdapter.test.mjs)
 │   ├── vercel.json                 # React Router SPA rewrite configuration
 │   └── package.json
 ├── edent.sql                       # Sanitized synthetic MySQL demonstration dataset
