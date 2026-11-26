@@ -10,7 +10,7 @@ eDent is a full-stack educational platform for managing dental practical work. I
 
 ## Project Authorship
 
-Originally created by **Yahya Mourid**, enhanced and modernized by **Aymen Alioua**.
+Developed and maintained by **Aymen Alioua**.
 
 ## Required Software
 

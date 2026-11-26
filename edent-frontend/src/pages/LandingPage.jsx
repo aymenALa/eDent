@@ -513,7 +513,7 @@ const LandingPage = () => {
                 Sign in
               </Link>
             </div>
-            <p>Originally created by Yahya Mourid • Modernized by Aymen Alioua</p>
+            <p>Developed and maintained by Aymen Alioua.</p>
           </div>
         </div>
       </footer>
